@@ -2150,14 +2150,14 @@ int main(int argc, char** argv){
   system(char_line);
   if(DEBUG_MODE) cout << "DONE!\n";
   
-  // //DELETES .ASM FILE
-  // if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
-  // ss << "shred -u " << asm_file;
-  // cmd_line = ss.str();
-  // char_line = cmd_line.c_str();
-  // ss.str("");
-  // system(char_line);
-  // if(DEBUG_MODE) cout << "DONE!\n";
+  //DELETES .ASM FILE
+  if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
+  ss << "shred -u " << asm_file;
+  cmd_line = ss.str();
+  char_line = cmd_line.c_str();
+  ss.str("");
+  system(char_line);
+  if(DEBUG_MODE) cout << "DONE!\n";
   
   stop_timer("DELETION");
   
