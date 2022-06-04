@@ -179,10 +179,10 @@ Else only activates if the previous ifs and elifs were not met.
 ```
 let x 49
 if(x>50)
-  x++;
+  x++
 end
 else
-  write(69);
+  write(69)
 end
 ```
 
