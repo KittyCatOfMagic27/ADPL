@@ -1,0 +1,44 @@
+_______NATIVE FUNCTIONS BY EXAMPLE_______
+
+
+WRITE & NEWLINE:
+
+fn main()
+  let string 'Hello World!' # string to print
+  write(string) # print string
+  new_line()
+end
+
+These functions are used to write to the
+terminal, they take in data of types char,
+string, ptr, or uint.
+
+
+PTR & SYSCALL:
+
+fn main()
+  let NR 1       # write syscall
+  let stdout 1   # write to term
+  let size 1     # size of string
+  let string 'H' # string to print
+  let string_ptr(ptr(string)) # get ptr
+  
+  syscall(NR stdout string_ptr size) # call
+end
+
+The ptr function is used to get the address
+of a variable in memory, this can be used
+in syscalls as showed here or for features
+yet to be implemented.
+
+Syscall allows the user to interact directly
+with the OS, right now the langauge is built
+for Debian Linux, so this with nasm could
+be used to reimplement the language within
+itself for another OS. This is because system
+call IDs and parameters differ between OS's.
+
+Linux Syscalls can be found here:
+  - https://chromium.googlesource.com/
+    chromiumos/docs/+/HEAD/constants/
+    syscalls.md

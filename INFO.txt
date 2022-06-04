@@ -1,0 +1,324 @@
+PROGRAM ADPL_LANG
+VER 0.0.7
+
+DESC:
+  A DUMB PROGRAMMING LANGUAGE LOL
+  INSPIRED BY TSODING ON YOUTUBE:
+  - https://www.youtube.com/c/TsodingDaily
+
+BASH_FUNCTION:
+  adpl --help
+  Check for in bash profile file.
+
+CHANGE_LOG:
+  BUG: ELIF CHAINS DON'T WORK WITH LOOPS.
+  ADDED FUNCTIONS write, new_line, syscall,
+  and ptr.
+  ADDED TYPES STRING AND PTR.
+  
+  
+
+CURRENT CAPABILITIES:
+  
+  Functions:
+    
+    Syntax:
+      
+      Define:
+      
+        fn foo(UINT x UINT y BOOL z)
+          # code
+        end
+        
+        Function declarations are made of 5 compnents.
+        We start with a function declaration (fn).
+        A function name, in this case foo.
+        Closed and open paraentheses with args and types
+        inbetween them. And then an end block at the end
+        of the function. Currently a function can only
+        have 6 arguments at maximum.
+      
+      Call:
+        
+        write(x)
+        
+        Inputs seperated with a space inside parantheses before
+        the name of the function to be called.
+        
+      Return:
+      
+        fn foo() start
+          let y 420
+          ret y
+        end
+        
+        fn main() start
+          let x(bar())
+          write(x)
+        end
+        
+        Put parantheses around a variable that the return value
+        is being assigned too.
+        To return use the ret keyword and then put a literal or
+        variable.
+        NOT CURRENTLY A FEATURE, WAS REMOVED IN OVERHAUL, WILL
+        REIMPLEMENT SOON.
+        
+      Native Functions:
+      
+        (NAME)         |    (USE)                     |    (TYPES)
+          write()      |  Writes input to stdout.     |  (PRINTED_VALUE)
+                       |                              |       ANY
+                       |                              |
+          new_line()   |  Writes new line.            |  (NONE)
+                       |                              |
+                       |                              |
+          syscall()    |  Preform syscalls n args.    |  (CALL_ID arg0 ... arg5)
+                       |                              |    UINT         ANY
+                       |                              |
+          ptr()        |  Gets pointer of variable    |  (VARIABLE)
+                       |  puts in rax or var.         |     ID
+          
+        
+  Variables:
+    
+    Syntax:
+      
+      Define:
+        
+        let x 420
+        
+        Put 'let' the variable name then the literal value.
+        If you want to assign expression to a variable,
+        put parantheses around the expression.
+        
+        let x(34+35)
+      
+      Use:
+        
+        Just use it like a literal.
+        
+        let z(x+y)
+        write(z)
+        
+      Reassign:
+      
+        fn main()
+          let y 69
+          y << 420 # the reassignment
+          write(y)
+        end
+        
+        Put the previously declared variable, the write to
+        operator, and then the new value as a variable or
+        literal.
+  
+  Comments:
+  
+    Syntax:
+      
+      Put a hash then put whatever you want after it.
+      
+      fn bar()
+        let x 69  # nice
+        let y 420 # dank
+      end
+        
+  Types:
+    
+    Ints:
+      
+      Operators:
+        
+        (OP SYMBOL)     |    (USE)
+          add (+)       |  adds two ints.
+          sub (-)       |  subtracts two ints.
+          mult (*)      |  multiplies two ints.
+          div (/)       |  divide two ints.
+          mod (%)       |  outputs remainder of a / b.
+          dec (--)      |  subtracts by 1.
+          inc (++)      |  adds by 1.
+          add_to (+=)   |  adds b to a.
+          sub_from (-=) |  subtracts b from a.
+          
+                  COMPARISON ONLY
+          
+          eql (==)      |  true if a equals b.
+          less_eq (<=)  |  true if a is less than b or a equals b.
+          great_eq (>=) |  true if a is greater than b or a equals b.
+          greater (>)   |  true if a is greater than b.
+          less (<)      |  true if a is less than b.
+          n_eql (!=)    |  true if a doesn't equal b.
+      
+      Define:
+        
+        Just type a number forhead.
+        7
+        11
+        420
+        69
+        The type keyword is UINT.
+        
+      Info:
+        
+        Stored in a 32-bit register.
+        Unsigned.
+        Max value of 2^32-1.
+        Min value of 0.
+        
+
+    Boolean:
+      
+      Operators:
+      
+        (OP SYMBOL)     |    (USE)
+          eql (==)      |  true if a equals b.
+          less_eq (<=)  |  true if a is less than b or a equals b.
+          great_eq (>=) |  true if a is greater than b or a equals b.
+          greater (>)   |  true if a is greater than b.
+          less (<)      |  true if a is less than b.
+          n_eql (!=)    |  true if a doesn't equal b.
+          not (!)       |  put before a boolean to flip the value.
+        
+      Define:
+      
+        let a true
+        let b false
+        let c(69<420)
+        The type keyword is BOOL.
+        
+      Info:
+      
+        Two states of true and false.
+        The product of comparison operators.
+        Stored in a single byte ptr.
+
+
+    Char:
+
+      Define:
+        
+        fn main()
+          write('H')
+          write('e')
+          write('l')
+          write('l')
+          write('o')
+          write(' ')
+          write('W')
+          write('o')
+          write('r')
+          write('l')
+          write('d')
+          write('!')
+          new_line()
+        end
+        
+        Put the character inbetween single quotes,
+        can be used in vars and in functions.
+        The type keyword is CHAR.
+        
+        
+    Pointer:
+    
+      Define:
+      
+        Internally defined with PTR, this is a value
+        gotten from the ptr() function.
+        
+        fn main()
+          let NR 1                    # Write ID
+          let stdout 1                # Stdout directory
+          let size 1                  # String size
+          let string 'H'              # String
+          let string_ptr(ptr(string)) # Pointer to String
+          
+          syscall(NR stdout string_ptr size) # Write String to stdout
+        end
+        
+    
+    String:
+    
+      Define:
+        
+        Currently just a constant value that is made to be
+        printed to the log. You make it the same as a char
+        but it has multiple characters. Has to be stored in
+        a variable.
+        
+        fn main()
+          let string 'Hello World!'
+          write(string)
+          new_line()
+        end
+      
+    
+    
+  Conditional Statements:
+    
+    Syntax:
+      
+      _____IF_____
+      
+      let x 10
+      let y 10
+      
+      if(x==y)
+        # your code here :D
+      end
+      
+      Use the keyword if with parenthese around a
+      comparison expression. A comparison expression
+      is defined as a literal or a variable, a comparison
+      operator, and a second a literal variable.
+
+      
+      ____ELIF____
+      
+      let x 0
+
+      if(false)
+        x++
+      end
+      elif(true)
+        write(69)
+      end
+
+      Works the same as if, but it is put after an if or another
+      elif and activates if the prevoius expressions where not met
+      and the one specified in the elif was.
+
+
+      ____ELSE____
+
+      let x 49
+
+      if(x>50)
+        x++;
+      end
+      else
+        write(69);
+      end
+
+      Activates if previous statements in the chain were all false,
+      this does NOT currently work with elif. This is purely out of
+      laziness and will be fixed soon.
+      
+  Loops:
+    
+    fn main()
+      let x 2
+      let y 1
+      let i 0
+      loop(i<5)
+        let z(x + y)
+        x << y
+        y << z
+        i++
+      end
+      write(x)
+    end
+
+    The loop goes until the condition defined is made false.
+    Here is a little program that gets the nth Lucas number using
+    the loop statement.
