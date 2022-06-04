@@ -106,7 +106,8 @@ Not Equal | != | True if a does not equal b.
 ### Boolean ### 
 Stored in a 8-bit register, have the type keyword of 'BOOL', and can be true or false. 
 They are the output of all comparison operators and are also a standalone type. 
-The kewords 'true' and 'false' are also used to set their value.
+The kewords 'true' and 'false' are also used to set their value.  
+Currently the only operator is not '!' which goes infront of a boolean variable and flips the value.
 
 ```
 let a true
