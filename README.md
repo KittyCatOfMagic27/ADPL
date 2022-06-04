@@ -30,7 +30,7 @@ For more information on the adpl command use the help flag.
 
 
 ## Documentation ##
-The entry point is the main function.   
+The entry point is the main function and additional documentation is in the files SYNTAX_STRUCT.txt and FUNCTIONS.txt.
     
 ### Functions ###
 To define a function you put the keyword 'fn', the function name, and then the arguments.   
