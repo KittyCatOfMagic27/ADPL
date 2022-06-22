@@ -42,3 +42,37 @@ Linux Syscalls can be found here:
   - https://chromium.googlesource.com/
     chromiumos/docs/+/HEAD/constants/
     syscalls.md
+
+_______VER 0.0.8_______
+
+ADDRESS FUNCTIONS:
+Used to minipulate addresses.
+---------DEPRECATED IN FAVOR OF THE FOLLOWING SYNTAX-----------
+addr_add(PTR address UINT bytes)              PTR new_address
+addr_sub(PTR address UINT bytes)              PTR new_address
+addr_get(TYPE type PTR address)               TYPE @address
+addr_equ(TYPE type PTR address ANY value)     NONE
+---------------------------------------------------------------
+new_address address + bytes                   ADD
+new_address address - bytes                   SUB
+value @TYPE address                           GET
+@TYPE address value                           ASSIGN
+
+UTILITY:
+General use and syscall wrappers.
+sleep(UINT seconds UINT nanoseconds)          NONE
+exit(UINT exit_code)                          NONE
+error(PTR err_msg UINT msg.len UINT err_code) NONE
+cast(TYPE type_to ANY value)                  TYPE casted_value
+writeln(...)                                  NONE
+open_fd(STRING filename UINT flags UINT mode) UINT fd
+close_fd(UINT fd)                             NONE
+read(UINT fd PTR buffer UINT len)             NONE
+fstats(UINT fd PTR buffer144)                 NONE
+
+
+EXPIREMENTAL, DEPRECATED, OR BUGGY:
+Either not fully developed or deprecated functions.
+array(TYPE type UINT length)                  PTR begining
+alloc(UINT bits)                              PTR begining
+read_bits(ANY value CONST BUFFER buff)        NONE
