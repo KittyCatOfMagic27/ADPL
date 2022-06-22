@@ -323,7 +323,7 @@ include | Links .asm or .adpl file to current file. NO USE CASE CURRENTLY
 extern | Tells the compiler a function was called that was from a link file. NO USE CASE CURRENTLY
 define | Replaces as all instances of the defined var with the value. EX: ;;define STDOUT 1
      
-The two ones that are currently defined are for linking files which is not fully implemented yet, BUT they are still in the source code in this branch so they are getting documentation.  
+The three ones that are currently defined as no use case are for linking files which is not fully implemented yet, BUT they are still in the source code in this version so they are getting documentation.  
 To use them you put the symbol ';;' in the global scope and then the arguements after it.
 ```
 ;;include 'stdlib.adpl'
