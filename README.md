@@ -156,8 +156,8 @@ let b false
    Name   |  OP Symbol  |       Use
 :---:|:---:|:---
 And | && | True if both are true. (a && b)
-Or | \|\| | True if one or both of them are true. (a || b)
-Xor | -\| | True if ONLY one of them is true. (a -| b)
+Or | \|\| | True if one or both of them are true. (a \|\| b)
+Xor | -\| | True if ONLY one of them is true. (a -\| b)
 Not | ! | Flips the value of a boolen. (a!)
     
 ### Character ###
