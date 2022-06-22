@@ -9,6 +9,9 @@
 #include <chrono>
 #include <utility>
 #include <algorithm>
+#include "./flags.h"
+#include <unistd.h>
+#include <limits.h>
 
 using namespace std;
 
@@ -49,10 +52,13 @@ vector<string> FN_LIST;
 vector<string> BSS;
 vector<int> ELSES;
 
+string FILE_BASENAME;
+string EXEC_FILE;
+bool DEBUG_MODE = false;
+bool RUN = false;
 
 stringstream ss;
 string WHITESPACE = " \n\r\t\f\v";
-bool DEBUG_MODE;
 int LOOP_COUNT = 0;
 int IF_COUNT = 0;
 int _START_CALL_AMOUNT = 0;
@@ -1571,7 +1577,6 @@ vector<string> INTERMEDIATE(){
         fd = type == "UINT" ? TK_STREAM[++i].first : "1";
         string buffer = TK_STREAM[++i].first;
         string count = TK_STREAM[++i].first;
-        cout << "COUNT: " << count << "\nBUFFER: " << buffer << "\nFD: " << fd << "\n";
         INTER.push_back("in");
         INTER.push_back("4");
         INTER.push_back("0");
@@ -2725,193 +2730,246 @@ void COMPILE(string &wf, vector <string> &INTER){
   }
 }
 
+namespace flags{
+  void DEBUGFLAG(string NA){
+    DEBUG_MODE = true;
+  }
+  
+  void RUNFLAG(string NA){
+    RUN = true;
+  }
+  
+  void ADPL_FILE(string FILENAME){
+    FILENAME.erase(FILENAME.size()-1);
+    if(FILENAME.find(".adpl") != string::npos){
+      FILENAME.erase(FILENAME.size()-5);
+      FILE_BASENAME = FILENAME;
+    }else{
+      FILE_BASENAME = FILENAME;
+    }
+  }
+  
+  void EXEC_FILE_SET(string EXEC_FILENAME){
+    EXEC_FILE = EXEC_FILENAME;
+  }
+  
+  void VERSIONFLAG(string NA){
+    cout << "ADPL VERSION 0.0.9\n";
+  }
+}
+
 int main(int argc, char** argv){
   assert(argc > 0);
-  cout << "\n";
-  start_timer();
-  int length = 0;
-  while(argv[1][++length]);
-  int file_name_size = length / sizeof(char);
-  string basename;
-  string argv1 = convertToString(argv[1], file_name_size);
-  string directory(argv[2]);
-  char debug_flag = argv[3][0];
-  if(debug_flag == '1'){
-    DEBUG_MODE = true;
-  }else{
-    DEBUG_MODE = false;
-  }
-  
-  if(argv1.find(".adpl")){
-    argv1.erase(argv1.length()-5);
-    basename = argv1;
-  }else{
-    basename = argv1;
-  }
-  
-  //INIT OF ADPL AND ASM FILES
-  ss << basename << ".adpl";
-  string adpl_file = directory+'/'+ss.str();
-  ss.str("");
-  if(DEBUG_MODE) cout << "ADPL FILE:\n" << adpl_file << "\n";
-  
-  ss << basename << ".asm";
-  string asm_file = directory+'/'+ss.str();
-  ss.str("");
-  if(DEBUG_MODE) cout << "\nASM FILE:\n" << asm_file << "\n";
-  
-  //COMPILATION OF ADPL
-  INIT_TABLE();
-  
-  stop_timer("START");
   start_timer();
   
-  //LEXING
-  if(DEBUG_MODE) cout << "\nTOKEN STREAM:\n";
-  LEXER(adpl_file.c_str());
-  if(DEBUG_MODE){
-    for(pair<string, string> &tk : TK_STREAM){
-      cout<<"("<<tk.first<<","<<tk.second<<"), ";
-      if(tk.first=="NL"){
-        cout<<"\n";
+  string help_desc = "This is the ADPL help desc!!!\nYou can bring up this page by using the --help flag.";
+  kf::FlagProxy prox(help_desc);
+  
+  string version_flag = "--version";
+  string version_flag_desc = "Provides the version of ADPL being used.";
+  prox.AddFlag(version_flag, flags::VERSIONFLAG, version_flag_desc, 0);
+  
+  string debug_flag = "-d";
+  string debug_flag_desc = "Prints debug text while compiling.";
+  prox.AddFlag(debug_flag, flags::DEBUGFLAG, debug_flag_desc, 0);
+  
+  string run_flag = "-r";
+  string run_flag_desc = "Runs program after compilation.";
+  prox.AddFlag(run_flag, flags::RUNFLAG, run_flag_desc, 0);
+  
+  string file_flag = "-f";
+  string file_flag_desc = "Provides ADPL file to compiler (Required).";
+  prox.AddFlag(file_flag, flags::ADPL_FILE, file_flag_desc, 1);
+  
+  string exec_flag = "-o";
+  string exec_flag_desc = "Name the exec file.";
+  prox.AddFlag(exec_flag, flags::EXEC_FILE_SET, exec_flag_desc, 1);
+  
+  prox.AddHelp("--build", "Rebuilds the compiler.");
+  prox.AddHelp("For additional info check README.md and FUNCTIONS.txt in /home/$USR/ADPL/.");
+  
+  prox.Parse(argc, argv);
+  
+  char tmp[PATH_MAX];
+  getcwd(tmp, sizeof(tmp));
+  string directory(tmp);
+  
+  if(FILE_BASENAME!=""){
+    
+    //INIT OF ADPL AND ASM FILES
+    ss << FILE_BASENAME << ".adpl";
+    string adpl_file = directory+'/'+ss.str();
+    ss.str("");
+    if(DEBUG_MODE) cout << "ADPL FILE:\n" << adpl_file << "\n";
+    
+    ss << FILE_BASENAME << ".asm";
+    string asm_file = directory+'/'+ss.str();
+    ss.str("");
+    if(DEBUG_MODE) cout << "\nASM FILE:\n" << asm_file << "\n";
+    
+    //COMPILATION OF ADPL
+    INIT_TABLE();
+    
+    
+    stop_timer("START");
+    start_timer();
+    
+    //LEXING
+    if(DEBUG_MODE) cout << "\nTOKEN STREAM:\n";
+    LEXER(adpl_file.c_str());
+    if(DEBUG_MODE){
+      for(pair<string, string> &tk : TK_STREAM){
+        cout<<"("<<tk.first<<","<<tk.second<<"), ";
+        if(tk.first=="NL"){
+          cout<<"\n";
+        }
       }
+      cout << "\n";
     }
-    cout << "\n";
-  }
-  stop_timer("LEXER");
-  
-  //CHECK SYNTAX ERRORS ECT.
-  start_timer();
-  CHECK_GRAMMER();
-  if(DEBUG_MODE){
-    cout << "\nEDITTED TKS:\n";
-    for(pair<string, string> &tk : TK_STREAM){
-      cout<<"("<<tk.first<<","<<tk.second<<"), ";
-      if(tk.first=="NL"){
-        cout<<"\n";
+    stop_timer("LEXER");
+    
+    //CHECK SYNTAX ERRORS ECT.
+    start_timer();
+    CHECK_GRAMMER();
+    if(DEBUG_MODE){
+      cout << "\nEDITTED TKS:\n";
+      for(pair<string, string> &tk : TK_STREAM){
+        cout<<"("<<tk.first<<","<<tk.second<<"), ";
+        if(tk.first=="NL"){
+          cout<<"\n";
+        }
       }
+      cout << "\n";
     }
-    cout << "\n";
-  }
-  stop_timer("GRAMMER CHECK");
-  
-  //TYPE CHECK
-  start_timer();
-  INIT_FUNC_ARG_REGISTER_LIST();
-  vector<string> INTER_CODE = INTERMEDIATE();
-  if(DEBUG_MODE){
-    for(string &tk : INTER_CODE){
-      cout<<tk<<" ";
-      if(tk==";"){
-        cout<<"\n";
+    stop_timer("GRAMMER CHECK");
+    
+    //TYPE CHECK
+    start_timer();
+    INIT_FUNC_ARG_REGISTER_LIST();
+    vector<string> INTER_CODE = INTERMEDIATE();
+    if(DEBUG_MODE){
+      for(string &tk : INTER_CODE){
+        cout<<tk<<" ";
+        if(tk==";"){
+          cout<<"\n";
+        }
       }
+      cout << "\n";
     }
-    cout << "\n";
-  }
-  PRESCAN(INTER_CODE);
-  stop_timer("INTERMEDIATE CODE GEN");
+    PRESCAN(INTER_CODE);
+    stop_timer("INTERMEDIATE CODE GEN");
+    
+    start_timer();
+    COMPILE(asm_file, INTER_CODE);
+    stop_timer("COMPILATION");
+    
+    start_timer();
   
-  start_timer();
-  COMPILE(asm_file, INTER_CODE);
-  stop_timer("COMPILATION");
-  
-  start_timer();
-
-  //COMPILATION OF ASM CODE
-  ss << "nasm -felf64 -o "<< basename << ".o " << asm_file;
-  string cmd_line = ss.str();
-  const char* char_line = cmd_line.c_str();
-  ss.str("");
-  system(char_line);
-  
-  vector<string> LINK_BASENAMES;
-  
-  for(int i = 0; i < LINKED_FILES.size(); i++){
-    cout << LINKED_FILES[i] << "\n";
-    //BROKE AS HELL, DW AB IT
-    // if(LINKED_FILES[i].find(".adpl")){
-    //   //ADD -nr FLAG (DOESN'T RUN PROG)
-    //   //ADD -nc DOESN'T COMPILE NASM
-    //   //REVAMP FLAG SYSTEM
-    //   //CAN ONLY LINK ASM FOR NOW
-    //   //DESIRED RESULT:
-    //   //  ;;include 'stdlib.adpl'
-    //   // cerr << "\033[1;31m[TODO!]CAN'T LINK ADPL FOR NOW!\033[0m\n";
-    //   // assert(false);
-    // }
-    // else{
-      string raw = LINKED_FILES[i];
-      string linking_basename = "";
-      for(int j = 0; j < raw.size()-4; j++){
-        linking_basename += raw[j];
-      }
-      ss << "nasm -felf64 -o "<< linking_basename << ".o " << raw;
-      string cmd_line = ss.str();
-      const char* char_line = cmd_line.c_str();
+    //COMPILATION OF ASM CODE
+    ss << "nasm -felf64 -o "<< FILE_BASENAME << ".o " << asm_file;
+    string cmd_line = ss.str();
+    const char* char_line = cmd_line.c_str();
+    ss.str("");
+    system(char_line);
+    
+    vector<string> LINK_BASENAMES;
+    
+    for(int i = 0; i < LINKED_FILES.size(); i++){
+      cout << LINKED_FILES[i] << "\n";
+      //BROKE AS HELL, DW AB IT
+      // if(LINKED_FILES[i].find(".adpl")){
+      //   //ADD -nr FLAG (DOESN'T RUN PROG)
+      //   //ADD -nc DOESN'T COMPILE NASM
+      //   //REVAMP FLAG SYSTEM
+      //   //CAN ONLY LINK ASM FOR NOW
+      //   //DESIRED RESULT:
+      //   //  ;;include 'stdlib.adpl'
+      //   // cerr << "\033[1;31m[TODO!]CAN'T LINK ADPL FOR NOW!\033[0m\n";
+      //   // assert(false);
+      // }
+      // else{
+        string raw = LINKED_FILES[i];
+        string linking_basename = "";
+        for(int j = 0; j < raw.size()-4; j++){
+          linking_basename += raw[j];
+        }
+        ss << "nasm -felf64 -o "<< linking_basename << ".o " << raw;
+        string cmd_line = ss.str();
+        const char* char_line = cmd_line.c_str();
+        ss.str("");
+        system(char_line);
+        if(DEBUG_MODE)cerr << char_line << "\n";
+        LINK_BASENAMES.push_back(linking_basename);
+      // }
+    }
+      
+    if(EXEC_FILE!=""){
+      ss << "ld -z muldefs -o " << EXEC_FILE << " " << FILE_BASENAME << ".o ";
+    }
+    else{
+      ss << "ld -z muldefs -o " << FILE_BASENAME << " " << FILE_BASENAME << ".o ";
+    }
+    for(string &s : LINK_BASENAMES){
+      ss << s << ".o ";
+    }
+    cmd_line = ss.str();
+    char_line = cmd_line.c_str();
+    ss.str("");
+    cerr << cmd_line << "\n";
+    system(char_line);
+    
+    stop_timer("\nCOMPILATION OF ASM");
+    if(RUN){
+      start_timer();
+      
+      cout << "\nPROGRAM OUTPUT:\n";
+      
+      ss << "./" << FILE_BASENAME;
+      cmd_line = ss.str();
+      char_line = cmd_line.c_str();
       ss.str("");
       system(char_line);
-      if(DEBUG_MODE)cerr << char_line << "\n";
-      LINK_BASENAMES.push_back(linking_basename);
-    // }
-  }
+      
+      stop_timer("RUN");
+      
+      cout << "\n";
+      
+      start_timer();
+    }
     
-  ss << "ld -z muldefs -o " << basename << " " << basename << ".o ";
-  for(string &s : LINK_BASENAMES){
-    ss << s << ".o ";
-  }
-  cmd_line = ss.str();
-  char_line = cmd_line.c_str();
-  ss.str("");
-  cerr << cmd_line << "\n";
-  system(char_line);
-  
-  stop_timer("\nCOMPILATION OF ASM");
-  start_timer();
-  
-  cout << "\nPROGRAM OUTPUT:\n";
-  
-  //ss << "./a.out";
-  ss << "./" << basename;
-  cmd_line = ss.str();
-  char_line = cmd_line.c_str();
-  ss.str("");
-  system(char_line);
-  
-  stop_timer("RUN");
-  
-  cout << "\n";
-  
-  start_timer();
-  
-  //DELETES .O FILE
-  if(DEBUG_MODE) cout << "DELETING "<< basename << ".o...\n";
-  ss << "shred -u " << basename << ".o";
-  cmd_line = ss.str();
-  char_line = cmd_line.c_str();
-  ss.str("");
-  system(char_line);
-  if(DEBUG_MODE) cout << "DONE!\n";
-  
-  for(string &s : LINK_BASENAMES){
-    if(DEBUG_MODE) cout << "DELETING "<< s << ".o...\n";
-    ss << "shred -u " << s << ".o";
+    //DELETES .O FILE
+    if(DEBUG_MODE) cout << "DELETING "<< FILE_BASENAME << ".o...\n";
+    ss << "shred -u " << FILE_BASENAME << ".o";
     cmd_line = ss.str();
     char_line = cmd_line.c_str();
     ss.str("");
     system(char_line);
     if(DEBUG_MODE) cout << "DONE!\n";
+    
+    for(string &s : LINK_BASENAMES){
+      if(DEBUG_MODE) cout << "DELETING "<< s << ".o...\n";
+      ss << "shred -u " << s << ".o";
+      cmd_line = ss.str();
+      char_line = cmd_line.c_str();
+      ss.str("");
+      system(char_line);
+      if(DEBUG_MODE) cout << "DONE!\n";
+    }
+    
+    //DELETES .ASM FILE
+    if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
+    ss << "shred -u " << asm_file;
+    cmd_line = ss.str();
+    char_line = cmd_line.c_str();
+    ss.str("");
+    system(char_line);
+    if(DEBUG_MODE) cout << "DONE!\n";
+    
+    stop_timer("DELETION");
   }
-  
-  //DELETES .ASM FILE
-  if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
-  ss << "shred -u " << asm_file;
-  cmd_line = ss.str();
-  char_line = cmd_line.c_str();
-  ss.str("");
-  system(char_line);
-  if(DEBUG_MODE) cout << "DONE!\n";
-  
-  stop_timer("DELETION");
+  else{
+    cerr << "\033[1;31mPLEASE PROVIDE A FILE WITH THE -f FLAG\033[0m\n";
+  }
   
   return 0;
 }
