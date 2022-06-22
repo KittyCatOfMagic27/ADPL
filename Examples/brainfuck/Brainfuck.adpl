@@ -45,7 +45,6 @@ fn main()
   i 0
   pointer tape.ptr
   let byte false
-  writeln(tape.ptr NEEDED_LEN)
   loop(i < size)
     let char @CHAR current
     if(char=='>')
