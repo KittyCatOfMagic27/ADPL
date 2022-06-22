@@ -76,3 +76,11 @@ Either not fully developed or deprecated functions.
 array(TYPE type UINT length)                  PTR begining
 alloc(UINT bits)                              PTR begining
 read_bits(ANY value CONST BUFFER buff)        NONE
+
+CAST TYPE CONVERSIONS AND USES:
+BOOL --> CHAR to get 1 or 0
+BOOL --> UINT to get 1 byte number or t/f
+CHAR --> BOOL to get number from digit
+CHAR --> UINT to get number from digit
+UINT --> CHAR to get any ascii value
+UINT --> BOOL to get 1 byte number
