@@ -1,0 +1,116 @@
+# FLAGS
+;;define O_RDONLY 0
+;;define O_WRONLY 1
+;;define O_RDWR 2
+# MODES
+;;define S_IRWXU 1792
+# OUTSTREAMS
+;;define STDERR 2
+;;define STDOUT 1
+;;define STDIN 0
+# OTHER
+;;define ST_SIZE 48
+;;define NEEDED_LEN 30000
+
+const filename './main.bf'
+const[144] stats
+const[30000] tape
+const[10000] prog
+const[1] buffer
+
+fn main()
+  # Open file
+  let fd open_fd(filename O_RDWR S_IRWXU)
+  # Get File size
+  let stats.ptr ptr(stats)
+  fstats(fd stats.ptr)
+  let util.ptr stats.ptr + ST_SIZE
+  let size @UINT util.ptr
+  # Def pointers
+  let prog.ptr ptr(prog)
+  let current prog.ptr
+  let tape.ptr ptr(tape)
+  let pointer tape.ptr
+  let buffer.ptr ptr(buffer)
+  # Zero init tape
+  let i 0
+  loop(i < 30000)
+    pointer++
+    @BOOL pointer false
+    i++
+  end
+  # Get program
+  read(fd prog.ptr size)
+  # Loop over program
+  i 0
+  pointer tape.ptr
+  let byte false
+  writeln(tape.ptr NEEDED_LEN)
+  loop(i < size)
+    let char @CHAR current
+    if(char=='>')
+      pointer++
+    else if(char=='<')
+      pointer--
+    else if(char=='+')
+      byte @BOOL pointer
+      let x cast(UINT byte)
+      x++
+      byte cast(BOOL x)
+      @BOOL pointer byte
+    else if(char=='-')
+      byte @BOOL pointer
+      x cast(UINT byte)
+      x--
+      byte cast(BOOL x)
+      @BOOL pointer byte
+    else if(char=='.')
+      let output @CHAR pointer
+      write(output)
+    else if(char==',')
+      read(STDIN buffer.ptr 1)
+      char @CHAR buffer.ptr
+      @CHAR pointer char
+      new_line()
+    else if(char=='[')
+      byte @BOOL pointer
+      x cast(UINT byte)
+      if(x==0)
+        let block_counter 1
+        loop(block_counter > 0)
+          i++
+          current++
+          char @CHAR current
+          if(char=='[') block_counter++
+          else if(char==']') block_counter-- end
+        end
+        char @CHAR current
+        if(char != ']')
+          writeln(STDERR 'F')
+          exit(420)
+        end
+      end
+    else if(char==']')
+      byte @BOOL pointer
+      x cast(UINT byte)
+      if(x!=0)
+        block_counter 1
+        loop(block_counter > 0)
+          i--
+          current--
+          char @CHAR current
+          if(char=='[') block_counter--
+          else if(char==']') block_counter++ end
+        end
+        char @CHAR current
+        if(char != '[')
+          writeln(STDERR 'f')
+          exit(420)
+        end
+      end
+    end
+    current++
+    i++
+  end
+  close_fd(fd)
+end
