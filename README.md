@@ -14,6 +14,10 @@ CHANGE LOG:
 - Compiler Commands
 - Lots of syscall wrappers
 - And much more!
+   
+PATCH 1 CHANGE LOG:
+- Flag system rework for actually dynamic flags
+- More flags :3
      
 Also incase it wasn't obvious this language is **MEGA UNSAFE**.
 So use this thing recreationly for now, change whatever you'd
@@ -32,7 +36,7 @@ the directory /home/$USR/ADPL/.
 
 ```
 usr@penguin:~$ adpl --help
-usr@penguin:~$ adpl <file>.adpl
+usr@penguin:~$ adpl -f <file>.adpl
 usr@penguin:~$ ./<file>
 ```
 
