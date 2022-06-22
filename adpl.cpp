@@ -6,8 +6,9 @@
 #include <cassert>
 #include <sstream>
 #include <unordered_map>
-#include <algorithm>
 #include <chrono>
+#include <utility>
+#include <algorithm>
 
 using namespace std;
 
@@ -16,244 +17,236 @@ using namespace std;
   usr@penguin:~$adpl --help
 */
 
-/*
-  [NOTE]:
-  COMPILATION TEMPORARILY REMOVED TO WORK ON
-  IMPLEMENTING TOKENIZATION SO FUNCTIONS CAN
-  ALSO BE IMPLEMENTED.
-  
-  FOR COMPILATION GO TO S2.
-  
-  [NOTE]:
-  ALSO WORKING ON PARSING INTO A TREE
-  
-  DIAGRAM OF TREE:
-  
-        args ----> fn_node
-                      |
-                      |
-                     expr
-                      |
-                      |
-   conditional ----> loop ----> expr...
-                      |
-                      |
- conditional ----> if_node ----> expr...
-                      |
-                      |
-   conditional ----> elif ----> expr...
-                      |
-                      |
-                     else ----> expr...
-                      |
-                      |
-                     ret
-  
-  TIME TO REWORK THE TREE FOR THE THIRD TIME
-  MOVING TO S4
-  
-  [TODO]:
-  S7 - VER 0.0.3
-  IMPLEMENT IF AND MAYBE ELSE AND ELIF ASWELL
-  
-  [TODO]:
-  S8 - VER 0.0.4
-  GIVE FUNCTIONS ARGS AND IMPLEMENT ELSE AND ELIF
-  
-  [TODO]:
-  S9 - VER 0.0.5
-  IMPLEMENT ELSE AND ELIF INSTEAD OF GOING OFF ON A
-  SIDE TANGENT DUMBASS.
-  FIX RECURSION BUG WHERE VARS SET BEFORE RECURSIVE CALL
-  AREN'T CORRUPTED. THIS COULD BE DONE BY POPPING THE
-  STACK BEFORE A RECURSIVE CALL.
-  
-  TYPE CHECKING, BOOLEAN TYPE, REVAMP PTR_MAP SYSTEM.
-  
-  PTR_MAP SYSTEM:
-  RUN THROUGH ALL OF PTR_MAPS IN BRANCH TO CHECK FOR
-  VARIABLES.
-
-  BOOLEAN:
-  THIS IS A TYPE THAT IS STILL DEFINED WITH LET,
-  WE CHECK IT BY THE INPUT EXPRESSION/VALUE.
-  THE PTR IS A BYTE POINTER, NOT DWORD LIKE INT.
-  IT IS SET 1 OR 0 (true/false).
-
-  TYPE CHECKING:
-  MAKE REVAMP CURRENT VAR MAP TO BE DATA ORIENTED.
-  IT WILL BE A VECTOR OF STRINGS.
-  DATA[0] = NAME
-  DATA[1] = TYPE
-  DATA[2] = ID/LITERAL
-  DATA[3...n] = DATA
-
-  MAKE HELPER FUNCTIONS FOR HANDING VAR MAP.
-  
-  MAKE MODULAR!
-  
-  
-  NEW IDEA TO OVERHAUL:
-  ONLY NODES ARE SCOPES.
-  TO PARSE THE CODE WE WILL USE THE NEW SYNTAX
-  STRUCTURE.
-  IT IS HIGHLY MODULAR AND GIVES A CHANCE IN THE
-  FUTURE FOR THE IMPLEMENTATION OF OPERATOR OVERLOADING
-  AND CUSTOM SYNTAXES AND STATEMENTS.
-  
-  NEW DIAGRAM:
-
-            function <---- arguments (In data field)
-               |
-        code in function
-               |
-              \|/
-               if <---- conditional (In data field)
-               |
-          code in scope
-               |
-              \|/
-              elif <---- conditional (In data field)
-               .
-               .
-               .
-              ret
-  
-  COMPILATION DIAGRAM:
-  
-          Tokenization
-               |
-               |
-             Define
-             Blocks
-               |
-               |
-             Block
-              Dec
-               &
-              Type
-             Tables
-               |
-               |
-             Syntax
-            Matching
-               |
-               |
-             Syntax
-           Processing
-          
-  [TODO]:
-  S10 - VER 0.0.6
-  REIMPLEMENT FUNCTIONS AND IF STATEMNETS. ELIF,
-  LOOPS, AND RECURSIVE FUNCTIONS ARE ON THE AGENDA.
-  AND MAYBE SEPERATE FILE FOR THE SYNTAX DECLARATIONS,
-  OR MAYBE EVEN A MINI LANG FOR ADPL SYNTAX DEFINING.
-  
-  POSSIBLE SYNTAX FOR MINI LANG:
-  
-  START
-  NAME(UINT+UINT)
-  STRUCTURE(UINT PLUS UINT -> EAX UINT)
-  KEY(A + B)
-  ASM_CODE(
-    mov eax, @A \n
-    add eax, @B \n
-  )
-  END
-  
-  [TODO]:
-  S11 - VER 0.0.7
-  FIX ELSE STATEMNETS. --DONE
-  ADD RETURN AND BREAK.
-  ADD BOOL LOGIC GATES.
-  ADD OPTIMIZATION STEP:
-    **CHECK IF A VALUE IS ALREADY IN A
-      REGISTAR
-    **DELETE REDUNDENT IF/ELIF/ELSE/LOOP
-      STATEMENTS
-  INTRODUCE CHAR TYPE AND WAY TO PRINT THEM.
-  
-  [NOTE*]: LONGER TERM GOAL OF BEING ABLE TO ADD
-    SYNTAXES LIVE
-    IDEA OF HOW THIS WOULD WORK:
-    
-    @SYN start
-      @.name "UINT+UINT"
-      @.struct "UINT PLUS UINT" "EAX UINT"
-      @.key "A" "+" "B"
-      @.asm start
-        "mov eax, @A"
-        "add eax, @B"
-      end
-    end
-    
-    This is a basic definition of a syntax.
-    To access a field of the syntax do @.[NAME]
-    Then to put info into it either do start end block
-    or just put strings.
-    
-    The name is just the internal name of the syntax.
-    
-    struct is the structure, the types, symbols, ect.
-    Then in struct we have a second argument,
-    this the out register in ASM and the output type.
-    
-    The key is the symbols that we use to access those
-    values in the psuedo nasm.
-    
-    @.asm is the psuedo nasm, in here we put the nasm
-    code and use @[KEY_SYM] to access the values that
-    we are provided with.
-    
-    This would be done during the parse stage, we would
-    add this to the SYM_TABLE and then carry on parsing.
-    
-*/
-
-struct SYNTAX{
-  vector<string> KEY;
-  vector<string> STRUCTURE;
-  vector<string> OUTPUT;
-  string NAME;
-  string OUT_REG;
-  string OUT_TYPE;
-};
-
-struct NODE{
-  string TYPE;
-  vector<string> DATA;
-  string OTHER;
-};
-
-unordered_map<string, SYNTAX> SYNTAX_MAP;
-unordered_map<string, string> tk_table;
-unordered_map<string, string> dec_table;
-unordered_map<int, NODE> TREE;
-unordered_map<int, int> BYTE_LIST;
-unordered_map<int, vector<int>> TREE_CONECTIONS;
-unordered_map<int, int> INV_TREE_CONNECTIONS;
-unordered_map<string, int> FN_LIST;
-unordered_map<string, string> INV_JUMP;
-unordered_map<string, int> SYM_TABLE;
-unordered_map<int, unordered_map<string, int>> PTR_MAPS;
-unordered_map<int, unordered_map<string, string>> TYPE_MAPS;
-vector<string> SYNTAX_LIST;
+unordered_map<string, unordered_map<string, string>> VAR_SIZE_MAPS;
+unordered_map<string, unordered_map<string, int>> PTR_MAPS;
+unordered_map<string, vector<vector<string>>> OPS;
+unordered_map<int, vector<string>> WORD_TABLE;
+unordered_map<string, int> CALL_AMOUNT_MAPS;
+unordered_map<string, int> PTR_AMOUNT_MAPS;
+unordered_map<string, string> DATA_TYPES;
+unordered_map<string, int> FN_ARG_COUNT;
 vector<string> FUNC_ARG_REGISTER_LIST64;
 vector<string> FUNC_ARG_REGISTER_LIST32;
 vector<string> FUNC_ARG_REGISTER_LIST8;
-vector<string> SYMBOL_LIST;
+unordered_map<string, string> VAR_TYPE;
+vector<pair<string, string>> TK_STREAM;
+unordered_map<string, string> COMP_JMP;
+unordered_map<string, string> INV_JMP;
+unordered_map<string, string> RET_FNS;
+unordered_map<string, string> RET_REG;
+unordered_map<string, bool> SYM_TABLE;
+unordered_map<string, int> TYPE_BITS;
+unordered_map<string, string> DEFINE;
+unordered_map<string, int> BYTE_MAP;
+vector<pair<string, string>> DATA;
 vector<string> SYSCALL_ARGS;
+vector<string> LINKED_FILES;
+vector<string> CONDITIONALS;
+vector<string> NATIVE_FNS;
+vector<string> GLOBAL_FNS;
+vector<string> EXTERN_FNS;
+vector<string> FN_LIST;
+vector<string> BSS;
+vector<int> ELSES;
+
 
 stringstream ss;
 string WHITESPACE = " \n\r\t\f\v";
 bool DEBUG_MODE;
-int L_COUNTER = 0;
-int NODE_INDEX = 0;
-int STRING_COUNTER = 0;
+int LOOP_COUNT = 0;
+int IF_COUNT = 0;
+int _START_CALL_AMOUNT = 0;
+int PTR_AMOUNT = 0;
+int DEBUGGER_COUNT = 0;
 auto START_TIME = chrono::high_resolution_clock::now();
 auto STOP_TIME = chrono::high_resolution_clock::now();
 auto DURATION_TIME = chrono::duration_cast<chrono::microseconds>(STOP_TIME - START_TIME);
 
+void breakpoint(int x = DEBUGGER_COUNT++){
+  cout << x << "\n";
+}
+
+void INIT_TABLE(){
+  TYPE_BITS["UINT"]=4;
+  TYPE_BITS["PTR"]=8;
+  TYPE_BITS["BOOL"]=1;
+  TYPE_BITS["CHAR"]=1;
+  
+  
+  //BYTES
+  WORD_TABLE[1].push_back("byte");
+  
+  WORD_TABLE[2].push_back("word");
+  
+  WORD_TABLE[3].push_back("byte");
+  WORD_TABLE[3].push_back("word");
+  
+  WORD_TABLE[4].push_back("dword");
+  
+  WORD_TABLE[5].push_back("byte");
+  WORD_TABLE[5].push_back("dword");
+  
+  WORD_TABLE[6].push_back("dword");
+  WORD_TABLE[6].push_back("word");
+  
+  WORD_TABLE[7].push_back("dword");
+  WORD_TABLE[7].push_back("word");
+  WORD_TABLE[7].push_back("byte");
+  
+  WORD_TABLE[8].push_back("qword");
+  
+  
+  SYM_TABLE["+"]=true;
+  SYM_TABLE["-"]=true;
+  SYM_TABLE["*"]=true;
+  SYM_TABLE["/"]=true;
+  SYM_TABLE["("]=true;
+  SYM_TABLE[")"]=true;
+  SYM_TABLE["%"]=true;
+  SYM_TABLE["<<"]=true;
+  SYM_TABLE["=="]=true;
+  SYM_TABLE["!="]=true;
+  SYM_TABLE["<="]=true;
+  SYM_TABLE[">="]=true;
+  SYM_TABLE[">"]=true;
+  SYM_TABLE["<"]=true;
+  SYM_TABLE["!"]=true;
+  SYM_TABLE["--"]=true;
+  SYM_TABLE["++"]=true;
+  // SYM_TABLE["+="]=true;
+  SYM_TABLE["@"]=true;
+  SYM_TABLE[";;"]=true;
+  SYM_TABLE["["]=true;
+  SYM_TABLE["]"]=true;
+  SYM_TABLE["&&"]=true;
+  SYM_TABLE["||"]=true;
+  SYM_TABLE["-|"]=true;
+  
+  NATIVE_FNS.push_back("write"); // VALUE   (if string PTR/CONST LENGTH)
+  NATIVE_FNS.push_back("writeln"); // VALUE   (if string PTR/CONST LENGTH)
+  NATIVE_FNS.push_back("syscall"); //
+  NATIVE_FNS.push_back("ptr"); // ID
+  RET_FNS["ptr"]="PTR";
+  RET_REG["ptr"]="rax";
+  NATIVE_FNS.push_back("len"); // CONST STRING (DEPRECATED?)
+  RET_FNS["len"]="UINT";
+  RET_REG["len"]="eax";
+  NATIVE_FNS.push_back("new_line"); // NA
+  NATIVE_FNS.push_back("array"); // TYPE AMOUNT
+  RET_FNS["array"]="PTR";
+  RET_REG["array"]="rax";
+  NATIVE_FNS.push_back("alloc"); // BYTES
+  RET_FNS["alloc"]="PTR";
+  RET_REG["alloc"]="rax";
+  NATIVE_FNS.push_back("addr_sub"); // PTR BYTES
+  RET_FNS["addr_sub"]="PTR";
+  RET_REG["addr_sub"]="rax";
+  NATIVE_FNS.push_back("addr_add"); // PTR BYTES
+  RET_FNS["addr_add"]="PTR";
+  RET_REG["addr_add"]="rax";
+  NATIVE_FNS.push_back("addr_get"); // TYPE PTR
+  RET_FNS["addr_get"]="$1";
+  RET_REG["addr_get"]="a";
+  NATIVE_FNS.push_back("addr_equ"); // TYPE PTR VALUE
+  NATIVE_FNS.push_back("sleep"); // SECONDS NANOSECONDS
+  NATIVE_FNS.push_back("exit"); // EXITCODE
+  NATIVE_FNS.push_back("error"); // STRING STRING.LEN EXITCODE
+  NATIVE_FNS.push_back("cast"); // TYPE ID
+  RET_FNS["cast"]="$1";
+  RET_REG["cast"]="a";
+  NATIVE_FNS.push_back("read_bits"); // VALUE BUFFER
+  NATIVE_FNS.push_back("open_fd"); // FILENAME(STRING) FLAGS(UINT) MODE(UINT)
+  RET_FNS["open_fd"]="UINT"; // FD(UINT)
+  RET_REG["open_fd"]="eax";
+  NATIVE_FNS.push_back("close_fd"); // FD(UINT)
+  NATIVE_FNS.push_back("read"); // FD(UINT) PTR(BUFFER) UINT(LEN)
+  NATIVE_FNS.push_back("fstats"); // FD(UINT) PTR(BUFFER[144])
+  
+  // SYMBOL              OUT     IN      IN    ...
+  OPS["++"].push_back({"UINT", "UINT"});
+  OPS["++"].push_back({"PTR", "PTR"});
+  OPS["--"].push_back({"UINT", "UINT"});
+  OPS["--"].push_back({"PTR", "PTR"});
+  
+  OPS["+"].push_back({"UINT", "UINT", "UINT"});
+  OPS["+"].push_back({"PTR", "PTR", "UINT"});
+  OPS["+"].push_back({"PTR", "UINT", "PTR"});
+  OPS["-"].push_back({"UINT", "UINT", "UINT"});
+  OPS["-"].push_back({"PTR", "PTR", "UINT"});
+  
+  OPS["*"].push_back({"UINT", "UINT", "UINT"});
+  OPS["/"].push_back({"UINT", "UINT", "UINT"});
+  OPS["%"].push_back({"UINT", "UINT", "UINT"});
+  OPS[">"].push_back({"BOOL", "UINT", "UINT"});
+  OPS["<"].push_back({"BOOL", "UINT", "UINT"});
+  OPS[">="].push_back({"BOOL", "UINT", "UINT"});
+  OPS["<="].push_back({"BOOL", "UINT", "UINT"});
+  
+  OPS["=="].push_back({"BOOL", "UINT", "UINT"});
+  OPS["!="].push_back({"BOOL", "UINT", "UINT"});
+  OPS["=="].push_back({"BOOL", "BOOL", "BOOL"});
+  OPS["!="].push_back({"BOOL", "BOOL", "BOOL"});
+  OPS["=="].push_back({"BOOL", "CHAR", "CHAR"});
+  OPS["!="].push_back({"BOOL", "CHAR", "CHAR"});
+  
+  OPS["!"].push_back({"BOOL", "BOOL"});
+  OPS["&&"].push_back({"BOOL", "BOOL", "BOOL"});
+  OPS["||"].push_back({"BOOL", "BOOL", "BOOL"});
+  OPS["-|"].push_back({"BOOL", "BOOL", "BOOL"}); //XOR BECAUSE THERE IS NO XOR STANDARD OTHER THAT ^ WHICH IS FOR EXPONENTS AS WELL
+  
+  COMP_JMP[">"]="jg";
+  COMP_JMP[">="]="jge";
+  COMP_JMP["<"]="jl";
+  COMP_JMP["<="]="jle";
+  COMP_JMP["!="]="jne";
+  COMP_JMP["=="]="je";
+  
+  INV_JMP["je"]="jne";
+  INV_JMP["jne"]="je";
+  INV_JMP["jg"]="jle";
+  INV_JMP["jl"]="jge";
+  INV_JMP["jge"]="jl";
+  INV_JMP["jle"]="jg";
+  INV_JMP[""]="jmp";
+  INV_JMP["jmp"]="";
+}
+
+void INIT_FUNC_ARG_REGISTER_LIST(){
+  FUNC_ARG_REGISTER_LIST64.push_back("rdi");
+  FUNC_ARG_REGISTER_LIST64.push_back("rsi");
+  FUNC_ARG_REGISTER_LIST64.push_back("rdx");
+  FUNC_ARG_REGISTER_LIST64.push_back("rcx");
+  FUNC_ARG_REGISTER_LIST64.push_back("r8");
+  FUNC_ARG_REGISTER_LIST64.push_back("r9");
+  
+  FUNC_ARG_REGISTER_LIST32.push_back("edi");
+  FUNC_ARG_REGISTER_LIST32.push_back("esi");
+  FUNC_ARG_REGISTER_LIST32.push_back("edx");
+  FUNC_ARG_REGISTER_LIST32.push_back("ecx");
+  FUNC_ARG_REGISTER_LIST32.push_back("r8d");
+  FUNC_ARG_REGISTER_LIST32.push_back("r9d");
+  
+  FUNC_ARG_REGISTER_LIST8.push_back("al");
+  FUNC_ARG_REGISTER_LIST8.push_back("dl");
+  FUNC_ARG_REGISTER_LIST8.push_back("cl");
+  
+  SYSCALL_ARGS.push_back("rax");
+  SYSCALL_ARGS.push_back("rdi");
+  SYSCALL_ARGS.push_back("rsi");
+  SYSCALL_ARGS.push_back("rdx");
+  SYSCALL_ARGS.push_back("r10");
+  SYSCALL_ARGS.push_back("r8");
+  SYSCALL_ARGS.push_back("r9");
+  
+  INV_JMP["je"]="jne";
+  INV_JMP["jne"]="je";
+  INV_JMP["jg"]="jle";
+  INV_JMP["jl"]="jge";
+  INV_JMP["jge"]="jl";
+  INV_JMP["jle"]="jg";
+  INV_JMP[""]="jmp";
+  INV_JMP["jmp"]="";
+}
 
 void start_timer(){
   START_TIME = chrono::high_resolution_clock::now();
@@ -266,37 +259,6 @@ void stop_timer(string timer_name){
   cout << timer_name <<" TIME: " << to_seconds << " seconds\n";
 }
 
-void print(NODE &x, int index){
-  if (x.TYPE != "") cout << "TYPE: "<<x.TYPE<<"\n";
-  if (x.DATA.size() > 0){
-    cout << "DATA: ";
-    for(string &str: x.DATA){
-      cout << str << " ";
-    }
-    cout << "\n";
-  }
-  if(TREE_CONECTIONS[index].size()>0){
-    cout << "CHILDREN: \n";
-    for(int y: TREE_CONECTIONS[index]){
-      print(TREE[y],y);
-    }
-    cout << "\n";
-  }
-}
-
-SYNTAX define_syntax(string &name, vector<string> &structure, vector<string> &key, vector<string> &output, string out_reg, string out_type){
-  SYNTAX new_syntax;
-  new_syntax.KEY = key;
-  new_syntax.STRUCTURE = structure;
-  new_syntax.OUTPUT = output;
-  new_syntax.NAME = name;
-  new_syntax.OUT_REG = out_reg;
-  new_syntax.OUT_TYPE = out_type;
-  SYNTAX_MAP[name] = new_syntax;
-  SYNTAX_LIST.push_back(name);
-  return new_syntax;
-}
-
 bool isNumber(const string& str){
   for (char const &c : str) {
     if (isdigit(c) == 0) return false;
@@ -304,132 +266,13 @@ bool isNumber(const string& str){
   return true;
 }
 
-string literal_type(string &literal){
-  if(literal=="TRUE" || literal=="FALSE")return "BOOL";
-  if(isNumber(literal))return "UINT";
-  if(literal[0]=='\''&&literal[literal.size()-1]=='\'')
-    if(literal.size()<=3)return "CHAR";
-    else return "STRING";
-  cerr << "'" <<literal<<"' IS OF UNKNOWN TYPE\n";
-  assert(false);
-}
-
 string literal_or_var(string &val){
-  if(val=="TRUE" || val=="FALSE")return "BOOL";
+  if(val=="true" || val=="false")return "BOOL";
   if(isNumber(val))return "UINT";
   if(val[0]=='\''&&val[val.size()-1]=='\'')
     if(val.size()<=3) return "CHAR";
     else return "STRING";
   return "ID";
-}
-
-bool pattern_match_syntax(SYNTAX &x, vector<string> &input, unordered_map<string, string> &type_map){
-  if(x.STRUCTURE.size() != input.size())return false;
-  for(int i = 0;i < x.STRUCTURE.size();i++){
-    if(input[i]==x.STRUCTURE[i]) continue;
-    if(find(SYMBOL_LIST.begin(), SYMBOL_LIST.end(), input[i]) != SYMBOL_LIST.end()) return false;
-    if(x.STRUCTURE[i] == "ANY_ID"){
-      if(literal_or_var(input[i]) == "ID")continue;
-      return false;
-    }
-    else if(x.STRUCTURE[i] == "UINT_ID"){
-      string type = literal_or_var(input[i]);
-      if(literal_or_var(input[i]) != "ID")return false;
-      if(type_map[input[i]]!="UINT")return false;
-      continue;
-    }
-    else if(x.STRUCTURE[i] == "BOOL_ID"){
-      string type = literal_or_var(input[i]);
-      if(literal_or_var(input[i]) != "ID")return false;
-      if(type_map[input[i]]!="BOOL")return false;
-      continue;
-    }
-    else if(x.STRUCTURE[i] == "CHAR_ID"){
-      string type = literal_or_var(input[i]);
-      if(literal_or_var(input[i]) != "ID")return false;
-      if(type_map[input[i]]!="BOOL")return false;
-      continue;
-    }
-    if(x.STRUCTURE[i] == "ANY") continue;
-    string type = literal_or_var(input[i]);
-    if(type == "ID") if(type_map[input[i]]==x.STRUCTURE[i]) continue;
-    if(type==x.STRUCTURE[i])continue;
-    return false;
-  }
-  return true;
-}
-
-string get_asm_value(string &var_or_lit, unordered_map<string, int> &ptr_table, string &type){
-  string ID = literal_or_var(var_or_lit);
-  if(ID == "ID"){
-    int ptr=ptr_table[var_or_lit];
-    if(type == "UINT"){
-      ss << "dword [rbp+" << ptr << "]";
-    }
-    else if(type == "BOOL" || type == "CHAR"){
-      ss << "byte [rbp+" << ptr << "]";
-    }
-    else if(type == "PTR"){
-      ss << "qword [rbp+" << ptr << "]";
-    }
-    else if(type == "STRING"){
-      ss << "__STRING" << ptr;
-    }
-    string output = ss.str();
-    ss.str("");
-    return output;
-  }
-  else{
-    string output;
-    if(type == "UINT" || type == "CHAR" || type == "PTR"){
-      output = var_or_lit;
-    }
-    else if(type == "STRING"){
-      // string label = "__STRING";
-      // label += to_string(STRING_COUNTER);
-      // STRING_COUNTER++;
-      // STRING_CONSTS[name] = label;
-      
-      // output = STRING_LITS[var_or_lit]; //get label from value
-      cerr << "[TODO!] String literals are not implemented!";
-      assert(false);
-    }
-    else if(type == "BOOL"){
-      if(var_or_lit=="TRUE"){
-        output = "1";
-      }
-      else{
-        output = "0";
-      }
-    }
-    return output;
-  }
-}
-
-vector<string> processs_syntax(SYNTAX &x, vector<string> &input, int &y){
-  vector<string> code;
-  for(int i = 0; i < x.OUTPUT.size(); i++){
-    auto j = find(x.KEY.begin(), x.KEY.end(), x.OUTPUT[i]);
-    if(j != x.KEY.end()){
-      int k = j - x.KEY.begin();
-      string type = x.STRUCTURE[k];
-      if(type == "ANY_ID"){
-        type = TYPE_MAPS[y][input[k]];
-      }
-      else if(type == "ANY"){
-        type = literal_or_var(input[k]);
-        if(type == "ID"){
-          type = TYPE_MAPS[y][input[k]];
-        }
-      }
-      else if(type == "UINT_ID") type = "UINT";
-      code.push_back(get_asm_value(input[k], PTR_MAPS[y], type));
-    }
-    else{
-      code.push_back(x.OUTPUT[i]);
-    }
-  }
-  return code;
 }
 
 string rtrim(const string &s){
@@ -530,503 +373,64 @@ vector<string> shift(vector<string> &v, string &x){
   return v;
 }
 
-void DECLARE_VAR(string &name, string &type, int block_node_index){
-  if(type != "STRING"){
-    int size;
+string asm_var(int ptr, int size){
+  string word = WORD_TABLE[size][0];
+  ss << word << " [rbp-" << ptr << "]";
+  string s = ss.str();
+  ss.str("");
+  return s;
+}
+
+string asm_get_value(string &value, unordered_map<string, int> &ptr_table){
+  string type = literal_or_var(value);
+  if(type == "ID"){
+    int ptr = ptr_table[value];
+    type = VAR_TYPE[value];
     if(type == "UINT"){
-      size = 4;
+      ss << "dword [rbp-" << ptr << "]";
     }
     else if(type == "BOOL" || type == "CHAR"){
-      size = 1;
+      ss << "byte [rbp-" << ptr << "]";
     }
     else if(type == "PTR"){
-      size = 8;
+      ss << "qword [rbp-" << ptr << "]";
     }
-    BYTE_LIST[block_node_index]+=size;
-    PTR_MAPS[block_node_index][name]=-BYTE_LIST[block_node_index];
-    TYPE_MAPS[block_node_index][name]=type;
+    else if(type == "STRING"){
+      cerr << "\033[1;31m[TODO!] STRING GET VAL NOT IMPLEMENTED YET.\033[0m\n";
+      assert(false);
+    }
+    else if(DATA_TYPES.find(value)!=DATA_TYPES.end()){
+      type = DATA_TYPES[value];
+      if(type == "STRING" || type == "ARRAY"){
+        ss << "[" << value << "]";
+      }
+      else if(type == "UINT"){
+        ss << value ;
+      }
+      else{
+        ss << value ;
+      }
+    }
+    else{
+      cerr << "\033[1;31mUNRECOGNIZED VARIABLE '"<<value<<"'.\033[0m\n";
+      assert(false);
+    }
+    string output = ss.str();
+    ss.str("");
+    return output;
   }
   else{
-    STRING_COUNTER++;
-    TYPE_MAPS[block_node_index][name] = type;
-    PTR_MAPS[block_node_index][name] = STRING_COUNTER;
+    if(value == "true"){
+      return "1";
+    }
+    else if(value == "false"){
+      return "0";
+    }
+    return value;
   }
 }
 
-void INIT_TABLE(){
-  tk_table["let"]="LET";
-  tk_table["+"]="PLUS";
-  tk_table["-"]="MINUS";
-  tk_table["*"]="MULT";
-  tk_table["/"]="DIV";
-  tk_table["write"]="WRITE";
-  tk_table["new_line"]="PNL";
-  tk_table["syscall"]="SYSCALL";
-  tk_table["ptr"]="GET_PTR";
-  tk_table["fn"]="FUNCDEC";
-  tk_table["start"]="START";
-  tk_table["end"]="END";
-  tk_table["("]="OP";
-  tk_table[")"]="CP";
-  tk_table["main"]="MAIN";
-  tk_table["%"]="MOD";
-  tk_table["if"]="IF";
-  tk_table["<<"]="WRITE_TO";
-  tk_table["=="]="EQL";
-  tk_table["!="]="NEQL";
-  tk_table["<="]="LESS_EQL";
-  tk_table[">="]="GREATER_EQL";
-  tk_table[">"]="GREATER";
-  tk_table["<"]="LESS";
-  tk_table["ret"]="RET";
-  tk_table["break"]="BREAK";
-  tk_table["true"]="TRUE";
-  tk_table["false"]="FALSE";
-  tk_table["else"]="ELSE";
-  tk_table["!"]="!";
-  tk_table["loop"]="LOOP";
-  tk_table["--"]="DEC";
-  tk_table["++"]="INC";
-  tk_table["elif"]="ELIF";
-  tk_table["+="]="+=";
-  tk_table["-="]="-=";
-  tk_table["@"]="@";
-  
-  SYM_TABLE["+"]=1;
-  SYM_TABLE["-"]=1;
-  SYM_TABLE["*"]=1;
-  SYM_TABLE["/"]=1;
-  SYM_TABLE["("]=1;
-  SYM_TABLE[")"]=1;
-  SYM_TABLE["%"]=1;
-  SYM_TABLE["<<"]=1;
-  SYM_TABLE["=="]=1;
-  SYM_TABLE["!="]=1;
-  SYM_TABLE["<="]=1;
-  SYM_TABLE[">="]=1;
-  SYM_TABLE[">"]=1;
-  SYM_TABLE["<"]=1;
-  SYM_TABLE["!"]=1;
-  SYM_TABLE["--"]=1;
-  SYM_TABLE["++"]=1;
-  SYM_TABLE["+="]=1;
-  SYM_TABLE["@"]=1;
-  
-  SYMBOL_LIST.push_back("PLUS");
-  SYMBOL_LIST.push_back("MINUS");
-  SYMBOL_LIST.push_back("MULT");
-  SYMBOL_LIST.push_back("DIV");
-  SYMBOL_LIST.push_back("OP");
-  SYMBOL_LIST.push_back("CP");
-  SYMBOL_LIST.push_back("MOD");
-  SYMBOL_LIST.push_back("EQL");
-  SYMBOL_LIST.push_back("NEQL");
-  SYMBOL_LIST.push_back("LESS_EQL");
-  SYMBOL_LIST.push_back("GREATER_EQL");
-  SYMBOL_LIST.push_back("GREATER");
-  SYMBOL_LIST.push_back("LESS");
-  SYMBOL_LIST.push_back("WRITE_TO");
-}
-
-void INIT_FUNC_ARG_REGISTER_LIST(){
-  FUNC_ARG_REGISTER_LIST64.push_back("rdi");
-  FUNC_ARG_REGISTER_LIST64.push_back("rsi");
-  FUNC_ARG_REGISTER_LIST64.push_back("rdx");
-  FUNC_ARG_REGISTER_LIST64.push_back("rcx");
-  FUNC_ARG_REGISTER_LIST64.push_back("r8");
-  FUNC_ARG_REGISTER_LIST64.push_back("r9");
-  
-  FUNC_ARG_REGISTER_LIST32.push_back("edi");
-  FUNC_ARG_REGISTER_LIST32.push_back("esi");
-  FUNC_ARG_REGISTER_LIST32.push_back("edx");
-  FUNC_ARG_REGISTER_LIST32.push_back("ecx");
-  FUNC_ARG_REGISTER_LIST32.push_back("r8d");
-  FUNC_ARG_REGISTER_LIST32.push_back("r9d");
-  
-  FUNC_ARG_REGISTER_LIST8.push_back("al");
-  FUNC_ARG_REGISTER_LIST8.push_back("dl");
-  
-  SYSCALL_ARGS.push_back("rax");
-  SYSCALL_ARGS.push_back("rdi");
-  SYSCALL_ARGS.push_back("rsi");
-  SYSCALL_ARGS.push_back("rdx");
-  SYSCALL_ARGS.push_back("r10");
-  SYSCALL_ARGS.push_back("r8");
-  SYSCALL_ARGS.push_back("r9");
-  
-  INV_JUMP["je"]="jne";
-  INV_JUMP["jne"]="je";
-  INV_JUMP["jg"]="jle";
-  INV_JUMP["jl"]="jge";
-  INV_JUMP["jge"]="jl";
-  INV_JUMP["jle"]="jg";
-  INV_JUMP[""]="jmp";
-  INV_JUMP["jmp"]="";
-}
-
-void INIT_SYNTAXES(){
-  string name = "UINT+UINT";
-  
-  vector<string> structure;
-  structure.push_back("UINT");
-  structure.push_back("PLUS");
-  structure.push_back("UINT");
-  
-  vector<string> key;
-  key.push_back("A");
-  key.push_back("+");
-  key.push_back("B");
-  
-  vector<string> asm_code;
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    add eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"eax","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT-UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("MINUS");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("-");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    sub eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"eax","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT*UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("MULT");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("*");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    mul ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"eax","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT/UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("DIV");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("/");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    div ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"eax","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT%UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("DIV");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("%");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    div ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"edx","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT>UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("GREATER");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back(">");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    cmp eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    setg al\n");
-  
-  define_syntax(name,structure,key,asm_code,"al","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT<UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("LESS");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("<");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    cmp eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    setl al\n");
-  
-  define_syntax(name,structure,key,asm_code,"al","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT==UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("EQL");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("==");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    cmp eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    sete al\n");
-  
-  define_syntax(name,structure,key,asm_code,"al","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT<=UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("LESS_EQL");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("<=");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    cmp eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    setle al\n");
-  
-  define_syntax(name,structure,key,asm_code,"al","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "UINT>=UINT";
-  
-  structure.push_back("UINT");
-  structure.push_back("GREATER_EQL");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back(">=");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("A");
-  asm_code.push_back("\n");
-  asm_code.push_back("    cmp eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    setge al\n");
-  
-  define_syntax(name,structure,key,asm_code,"al","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "REASSIGN";
-  
-  structure.push_back("ANY_ID");
-  structure.push_back("WRITE_TO");
-  structure.push_back("ANY");
-  
-  key.push_back("A");
-  key.push_back("<<");
-  key.push_back("B");
-  
-  asm_code.push_back("    mov eax, ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  asm_code.push_back("    mov ");
-  asm_code.push_back("A");
-  asm_code.push_back(", eax \n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","ANY");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "INC";
-  
-  structure.push_back("UINT_ID");
-  structure.push_back("INC");
-  
-  key.push_back("A");
-  key.push_back("++");
-  
-  asm_code.push_back("    add ");
-  asm_code.push_back("A");
-  asm_code.push_back(", 1");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "DEC";
-  
-  structure.push_back("UINT_ID");
-  structure.push_back("DEC");
-  
-  key.push_back("A");
-  key.push_back("--");
-  
-  asm_code.push_back("    sub ");
-  asm_code.push_back("A");
-  asm_code.push_back(", 1");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "PLUS_EQUALS";
-  
-  structure.push_back("UINT_ID");
-  structure.push_back("+=");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("+=");
-  key.push_back("B");
-  
-  asm_code.push_back("    add ");
-  asm_code.push_back("A");
-  asm_code.push_back(", ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "MIN_EQUALS";
-  
-  structure.push_back("UINT_ID");
-  structure.push_back("-=");
-  structure.push_back("UINT");
-  
-  key.push_back("A");
-  key.push_back("-=");
-  key.push_back("B");
-  
-  asm_code.push_back("    sub ");
-  asm_code.push_back("A");
-  asm_code.push_back(", ");
-  asm_code.push_back("B");
-  asm_code.push_back("\n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","UINT");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-  
-  
-  name = "NOT_OP";
-  
-  structure.push_back("!");
-  structure.push_back("BOOL_ID");
-  
-  key.push_back("!");
-  key.push_back("A");
-  
-  asm_code.push_back("    xor ");
-  asm_code.push_back("A");
-  asm_code.push_back(", 1\n");
-  
-  define_syntax(name,structure,key,asm_code,"NA","BOOL");
-  structure.clear();
-  key.clear();
-  asm_code.clear();
-}
-
-void process_line(string &line, vector<string> &token_stream){
+void process_line(string &line){
   vector<string> ops = split(line);
   if(DEBUG_MODE){
     for(string op: ops){
@@ -1034,495 +438,1578 @@ void process_line(string &line, vector<string> &token_stream){
     }
     cout << "\n";
   }
-  string STATE = "NONE";
-  for(string& op: ops){
-    if(tk_table.find(op) == tk_table.end()){
-      string type = literal_or_var(op);
-      if(type!="ID"){
-        token_stream.push_back(op);
-      }
-      else if(dec_table.find(op) == dec_table.end()){
-        if(*(&op - 1) == "let" || STATE == "FUNCTION_ARGS"){
-          token_stream.push_back(op);
-          string next_op = *(&op + 1);
-          if(isNumber(next_op)||dec_table[next_op]=="UINT")
-            dec_table[op] = "UINT";
-          else if(next_op=="true" || next_op=="false" ||dec_table[next_op]=="BOOL")
-            dec_table[op] = "BOOL";
-          else if(next_op[0]=='\''&&next_op[next_op.size()-1]=='\'')
-            if(next_op.size()<=3)
-              dec_table[op] = "CHAR";
-            else
-              dec_table[op] = "STRING";
-          else
-            dec_table[op] = "ID";
-        }
-        else if(*(&op - 1) == "fn"){
-          token_stream.push_back(op);
-          dec_table[op] = "FUNC";
-          STATE = "FUNCTION";
-        }
-        else if(*(&op - 1) == "if"){
-          token_stream.push_back(op);
-          dec_table[op] = "IF_STATEMENT";
-          STATE = "FUNCTION";
+  vector<int> IF_STACK;
+  for(int i = 0; i < ops.size(); i++){
+    string op = ops[i];
+    pair<string,string> result;
+    if(op=="let"){
+      result.first=op;
+      result.second=ops[++i];
+      TK_STREAM.push_back(result);
+    }
+    else if(op=="const"){
+      string var = ops[++i];
+      string value = ops[++i];
+      pair<string, string> buff;
+      if(var!="["){
+        buff.first = var;
+        buff.second = value;
+        DATA.push_back(buff);
+        DATA_TYPES[var]=literal_or_var(value);
+        if(DATA_TYPES[var]=="STRING"){
+          string length = var + ".len";
+          buff.first = length;
+          buff.second = " equ $ - " + var;
+          DATA.push_back(buff);
+          DATA_TYPES[length] = "UINT";
         }
       }
       else{
-        token_stream.push_back(op);
+        string amount = ops[i++];
+        var = ops[++i];
+        if(ops[i+1]=="["){
+          cerr << "\033[1;31mVALUE: "<< ops[i+1] << "\n"
+          "[TODO!] ASSIGNING VALS TO ARRAYS NOT IMPLEMENTED YET.\033[0m\n";
+          assert(false);
+        }
+        BSS.push_back(var + " resb " + amount + "\n");
+        DATA_TYPES[var] = "ARRAY";
       }
     }
-    else{
-      if(STATE == "FUNCTION" && op == "("){
-        STATE = "FUNCTION_ARGS";
-      }else if(STATE == "FUNCTION_ARGS" && op == ")"){
-        STATE = "NONE";
+    else if(op=="fn"){
+      result.first=op;
+      result.second=ops[++i];
+      TK_STREAM.push_back(result);
+      FN_LIST.push_back(ops[i]);
+    }
+    else if(op=="if"){
+      result.first=op;
+      result.second=to_string(++IF_COUNT);
+      IF_STACK.push_back(IF_COUNT);
+      TK_STREAM.push_back(result);
+    }
+    else if(op=="else"){
+      result.first=op;
+      TK_STREAM.push_back(result);
+    }
+    else if(op=="loop"){
+      result.first=op;
+      result.second=to_string(++LOOP_COUNT);
+      TK_STREAM.push_back(result);
+    }
+    else if(OPS.find(op) != OPS.end()){
+      TK_STREAM.pop_back();
+      result.first=op;
+      TK_STREAM.push_back(result);
+      result.first=ops[i-1];
+      result.second="";
+      TK_STREAM.push_back(result);
+    }
+    else if(TYPE_BITS.find(op) != TYPE_BITS.end()){
+      result.first=op;
+      result.second=ops[++i];
+      TK_STREAM.push_back(result);
+    }
+    else if(DEFINE.find(op) != DEFINE.end()){
+      result.first=DEFINE[op];
+      TK_STREAM.push_back(result);
+    }
+    else if(op==";;"){
+      if(ops[++i]=="include"){
+        string fd = ops[++i];
+        if(fd[0]!='\''){
+          cerr << "\033[1;31mPUT THE FILE DIRECTORY AS A STRING.\033[0m\n";
+          assert(false);
+        }
+        string trimmed;
+        for(int j = 1; j < fd.size()-1; j++){
+          trimmed += fd[j];
+        }
+        LINKED_FILES.push_back(trimmed);
       }
-      string tk = tk_table[op];
-      token_stream.push_back(tk);
+      else if(ops[i]=="global"){
+        GLOBAL_FNS.push_back(ops[++i]);
+      }
+      else if(ops[i]=="extern"){
+        EXTERN_FNS.push_back(ops[++i]);
+        FN_LIST.push_back(ops[i]);
+      }
+      else if(ops[i]=="define"){
+        string var = ops[++i];
+        string value = ops[++i];
+        DEFINE[var] = value;
+      }
+      else{
+        cerr << "\033[1;31mCOMMAND "<< ops[i] <<" DOESN'T EXIST!\033[0m\n";
+      }
+    }
+    else if(op=="@"){
+      result.first=op;
+      result.second=ops[++i];
+      TK_STREAM.push_back(result);
+    }
+    else if(op!=""){
+      result.first=op;
+      TK_STREAM.push_back(result);
     }
   }
-  token_stream.push_back("NL");
 }
 
-vector<string> LEXER(const char* fd){
+void LEXER(const char* fd){
   string line;
   ifstream source_code;
   source_code.open(fd);
-  vector<string> token_stream;
   if(source_code.is_open()){
     while(getline(source_code,line)){
-      if(line!="")process_line(line, token_stream);
+      if(line!="")process_line(line);
     }
     source_code.close();
-    return token_stream;
   }
   else {
     cerr << "Unable to open file.\n";
     cerr << fd << "\n";
     assert(false);
   }
-  return token_stream;
 }
 
-int TRAVERSE_TREE(int current, string desired_type){
-  while(true){
-    if(TREE[current].TYPE==desired_type)return current;
-    current = INV_TREE_CONNECTIONS[current];
-    if(current==0){
-      cerr << "COULDN'T FIND THE NODE TYPE '" << desired_type << "' IN TREE TRAVERSE.";
+void TYPE_CHECK(pair<string, string>& var){
+  string type = literal_or_var(var.second);
+  if(type == "ID"){
+    if(VAR_TYPE.find(var.second) != VAR_TYPE.end()){
+      VAR_TYPE[var.first] = VAR_TYPE[var.second];
+    }
+    else if(RET_FNS.find(var.second) != RET_FNS.end()){
+      VAR_TYPE[var.first] = RET_FNS[var.second];
+    }
+    else if(DATA_TYPES.find(var.second) != DATA_TYPES.end()){
+      VAR_TYPE[var.first] = DATA_TYPES[var.second];
+    }
+    else if(TYPE_BITS.find(var.second) != TYPE_BITS.end()){
+      VAR_TYPE[var.first] = var.second;
+    }
+    else{
+      cerr << "\033[1;31m"<<"VARIABLE '"<<var.second<<"' IS UNDEFINED!"<<"\033[0m\n";
       assert(false);
     }
   }
-}
-
-void ATT_NODE(int parent_index, int child_index){
-  TREE_CONECTIONS[parent_index].push_back(child_index);
-  INV_TREE_CONNECTIONS[child_index]=parent_index;
-}
-
-NODE FN_NODE(vector<string> &label_args){
-  NODE function_node;
-  function_node.TYPE = "FUNC";
-  function_node.DATA = label_args;
-  for(int i = 1; i < (label_args.size()-1)/2; i++){
-    DECLARE_VAR(label_args[i*2], label_args[i*2-1], NODE_INDEX);
+  else{
+    VAR_TYPE[var.first] = type;
   }
-  TREE[NODE_INDEX] = function_node;
-  NODE_INDEX++;
-  return function_node;
 }
 
-NODE IF_NODE(vector<string> &conditional){
-  NODE if_node;
-  if_node.TYPE = "IF";
-  if_node.DATA = conditional;
-  TREE[NODE_INDEX] = if_node;
-  NODE_INDEX++;
-  return if_node;
-}
-
-NODE VAR_DEC_NODE(string &name, string type = "", string value = ""){
-  NODE var_dec_node;
-  var_dec_node.TYPE = "VAR_DEC";
-  if(type == "" || value == ""){
-    var_dec_node.DATA = {name};
-  }else{
-    var_dec_node.DATA = {name, type, value};
+void OP_MATCH(string &sym, int &op_code, int &i, string &type){
+  op_code = -1;
+  for(int k = 0; k < OPS[sym].size(); k++){
+    vector<string> v = OPS[sym][k];
+    bool brk = false;
+    for(int j = 1; j < v.size(); j++){
+      string curv = TK_STREAM[i+j].first;
+      string curt = literal_or_var(curv);
+      if(curt=="ID"){
+        if(VAR_TYPE.find(curv)!=VAR_TYPE.end()) curt = VAR_TYPE[curv];
+        else if(DATA_TYPES.find(curv)!=DATA_TYPES.end()) curt = DATA_TYPES[curv];
+      }
+      if(v[j]!=curt) break;
+      if(j == v.size()-1) op_code = k;
+      type = v[0];
+      brk = true;
+    }
+    if(brk) break;
   }
-  TREE[NODE_INDEX] = var_dec_node;
-  NODE_INDEX++;
-  return var_dec_node;
 }
 
-NODE VAR_EXPR_NODE(string &name, string &type){
-  NODE var_dec_node;
-  var_dec_node.TYPE = "VAR_EXPR";
-  var_dec_node.DATA = {name, type};
-  TREE[NODE_INDEX] = var_dec_node;
-  NODE_INDEX++;
-  return var_dec_node;
-}
-
-NODE PROGRAM_NODE(){
-  NODE program_node;
-  program_node.TYPE = "PROGRAM";
-  TREE[NODE_INDEX] = program_node;
-  NODE_INDEX++;
-  return program_node;
-}
-
-NODE CODE_NODE(string &syntax_name, vector<string> &data){
-  NODE code_node;
-  code_node.TYPE = "CODE";
-  code_node.DATA = data;
-  code_node.DATA.push_back(syntax_name);
-  rotate(code_node.DATA.rbegin(), code_node.DATA.rbegin() + 1, code_node.DATA.rend());
-  TREE[NODE_INDEX] = code_node;
-  NODE_INDEX++;
-  return code_node;
-}
-
-NODE FN_CALL_NODE(vector<string> &label_args, string out_type = "UINT"){
-  NODE fn_call_node;
-  fn_call_node.TYPE = "FN_CALL";
-  fn_call_node.DATA = label_args;
-  fn_call_node.OTHER = out_type;
-  TREE[NODE_INDEX] = fn_call_node;
-  NODE_INDEX++;
-  return fn_call_node;
-}
-
-NODE ELSE_NODE(){
-  NODE else_node;
-  else_node.TYPE = "ELSE";
-  TREE[NODE_INDEX] = else_node;
-  NODE_INDEX++;
-  return else_node;
-}
-
-NODE ELIF_NODE(vector<string> &conditional){
-  NODE elif_node;
-  elif_node.TYPE = "ELIF";
-  elif_node.DATA = conditional;
-  TREE[NODE_INDEX] = elif_node;
-  NODE_INDEX++;
-  return elif_node;
-}
-
-NODE LOOP_NODE(vector<string> &conditional){
-  NODE loop_node;
-  loop_node.TYPE = "LOOP";
-  loop_node.DATA = conditional;
-  TREE[NODE_INDEX] = loop_node;
-  NODE_INDEX++;
-  return loop_node;
-}
-
-NODE BREAK_NODE(int loop){
-  NODE break_node;
-  break_node.TYPE = "BREAK";
-  break_node.DATA = {to_string(loop)};
-  TREE[NODE_INDEX] = break_node;
-  NODE_INDEX++;
-  return break_node;
-}
-
-class PARSER{
-  public:
-    
-    vector<string> token_stream;
-    vector<int> BLOCK_STACK;
-    string STATE = "NONE";
-    vector<string> stack;
-    int CURRENT_FN;
-    
-    PARSER(vector<string> tk_stream){
-      token_stream = tk_stream;
-      PROGRAM_NODE();
-      BLOCK_STACK.push_back(0);
-      fn_list_init();
+void CHECK_GRAMMER(){
+  vector<string> BLOCK_STACK;
+  string CF;
+  for(int i = 0; i < TK_STREAM.size(); i++){
+    pair<string, string> cur = TK_STREAM[i];
+    if(cur.first=="let"){
+      string value = TK_STREAM[++i].first;
+      pair<string, string> var(cur.second, value);
+      if(value=="@"){
+        value = TK_STREAM[i].second;
+        var.second = value;
+      }
+      else if(RET_FNS.find(value) != RET_FNS.end()){
+        string out_type = RET_FNS[value];
+        if(out_type[0]=='$'){
+          int arg_n = out_type[1]-'0';
+          var.second = TK_STREAM[i+arg_n+1].first;
+        }
+      }
+      else if(OPS.find(value) != OPS.end()){
+        int op_code;
+        string type;
+        OP_MATCH(value, op_code, i, type);
+        if(op_code < 0){
+          cerr << "\033[1;31m"<<"OPERATION "<< value <<" CANNOT BE MATCHED IN ASSIGNMENT OF '"<< cur.second <<"'!\033[0m\n";
+          assert(false);
+        }
+        var.second = type;
+        TK_STREAM[i].second = to_string(op_code);
+      }
+      TYPE_CHECK(var);
     }
-  
-    void run(){
-      if(DEBUG_MODE) cout << "TOKEN:         STATE:\n";
-      for(string& tk : token_stream){
-        if(tk == "NL"){STATE = "NONE"; stack.clear(); continue;}
-        func_handler(tk);
-        loop_handler(tk);
-        func_call_handler(tk);
-        if_handler(tk);
-        var_handler(tk);
-        code_handler(tk);
-        if(DEBUG_MODE) cout << tk << "         " << STATE << "\n";
+    else if(cur.first=="fn"){
+      pair<string, string> fn(cur.second, "");
+      BLOCK_STACK.push_back(cur.second);
+      CF = cur.second;
+      if(CF == "main") CF = "_start";
+      pair<string, string> buff = TK_STREAM[i+1];
+      int j = 2;
+      while(buff.first!=")"){
+        buff = TK_STREAM[i+j];
+        j++;
       }
+      if(TYPE_BITS.find(TK_STREAM[i+j].first) != TYPE_BITS.end()) RET_FNS[CF]=TK_STREAM[i+j].first;
+      int size = TYPE_BITS[TK_STREAM[i+j].first];
+      string reg;
+      if(size == 8) reg = "rax";
+      else if(size == 4) reg = "eax";
+      else if(size == 1) reg = "al";
+      RET_REG[CF] = reg;
     }
-    
-  private:
-    
-    void func_call_handler(string &tk){
-      if(STATE == "CALLING_FUNC"){
-        if(tk == "CP"){
-          STATE = "FUNC_CALL_END";
-          NODE called_fn = FN_CALL_NODE(stack);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          stack.clear();
-        }
-        else if(tk != "OP"){
-          stack.push_back(tk);
-        }
-      }
-      else if(STATE == "NONE" && FN_LIST[tk]!=0){
-        stack.push_back(tk);
-        STATE = "CALLING_FUNC";
-      }
+    else if(cur.first=="loop"){
+      BLOCK_STACK.push_back("loop");
     }
-    
-    void func_handler(string &tk){
-      if(STATE == "FUNCDEC"){
-        if(tk == "CP"){
-          NODE func_node = FN_NODE(stack);
-          int arg_count = (stack.size()-1)/2;
-          for(int i = 0; i < arg_count; i++){
-            string var = stack[(i*2)+2];
-            string type = stack[(i*2)+1];
-            DECLARE_VAR(var, type, NODE_INDEX-1);
-          }
-          FN_LIST[stack[0]]=NODE_INDEX-1;
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          CURRENT_FN = NODE_INDEX-1;
-          BLOCK_STACK.push_back(NODE_INDEX-1);
-          stack.clear();
-          STATE = "FINISH_DEC";
-        }
-        else if(tk != "OP"){
-          stack.push_back(tk);
-        }
+    else if(cur.first=="if"){
+      BLOCK_STACK.push_back("if"+cur.second);
+    }
+    else if(cur.first=="else"){
+      string if_label = BLOCK_STACK[BLOCK_STACK.size()-1];
+      string _if;
+      for(int j = 2; j < if_label.size(); j++){
+        _if += if_label[j];
       }
-      else if(tk == "FUNCDEC"){
-        STATE = "FUNCDEC";
-      }
-      else if(tk == "START"){
-        STATE = "STARTING_BLOCK";
-      }
-      else if(tk == "END"){
-        STATE = "ENDING_BLOCK";
+      if(isNumber(_if)){
         BLOCK_STACK.pop_back();
+        TK_STREAM[i].second = to_string(ELSES.size());
+        BLOCK_STACK.push_back("else"+_if);
+        ELSES.push_back(stoi(_if));
+      }
+      else{
+        cerr << "\033[1;31mERROR: ELSE NOT PROCEEDING IF OR ELSE IF!\033[0m\n";
+    assert(false);
+      }
+      string else_label = BLOCK_STACK.at(BLOCK_STACK.size()-2);
+      if(else_label.size() > 4){
+        if(else_label[0] == 'e' && else_label[1] == 'l' && else_label[2] == 's' && else_label[3] == 'e'){
+          string _else;
+          for(int j = 4; j < else_label.size(); j++){
+            _else += else_label[j];
+          }
+          int else_id = stoi(_else);
+          int replace_with = stoi(_if);
+          replace_if(ELSES.begin(), ELSES.end(), [else_id](int &j){
+            return j == else_id;
+          }, replace_with);
+          BLOCK_STACK.pop_back();
+          BLOCK_STACK.pop_back();
+          BLOCK_STACK.push_back("else"+_if);
+        }
       }
     }
-    
-    void var_handler(string &tk){
-      if(STATE == "VAR_START"){
-        stack.push_back(tk);
-        STATE = "DEC_VAR";
+    else if(OPS.find(cur.first) != OPS.end()){
+      int op_code;
+      string type;
+      OP_MATCH(cur.first, op_code, i, type);
+      if(op_code < 0){
+        cerr << "\033[1;31mOPERATION "<< cur.first <<" CANNOT BE MATCHED!\033[0m\n";
+        assert(false);
       }
-      else if(STATE == "DEC_VAR"){
-        if(tk != "OP"){
-          string type = literal_or_var(tk);
-          if(type == "ID"){
-            type = TYPE_MAPS[CURRENT_FN][tk];
-            if(DEBUG_MODE) cout << type << "\n";
-          }
-          DECLARE_VAR(stack[0], type, CURRENT_FN);
-          NODE var_node = VAR_DEC_NODE(stack[0], type, tk);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          STATE = "VAR_END";
-          stack.clear();
+      TK_STREAM[i].second = to_string(op_code);
+    }
+    else if(cur.first=="end"){
+      string block = BLOCK_STACK[BLOCK_STACK.size()-1];
+      BLOCK_STACK.pop_back();
+      if(block[0]=='i'&&block[1]=='f'){
+        block = BLOCK_STACK[BLOCK_STACK.size()-1];
+        if(block[0]=='e'&&block[1]=='l'&&block[2]=='s'&&block[3]=='e'){
+          BLOCK_STACK.pop_back();
+          block = "elif";
         }
         else{
-          STATE = "VAR_EXPR";
+          block = "if";
         }
       }
-      else if(STATE == "VAR_EXPR"){
-        if(FN_LIST[tk]!=0){
-          STATE = "VAR_FUNC";
-          stack.push_back(tk);
-        }
-        else if(tk != "CP"){
-          stack.push_back(tk);
-          vector<string> tokens;
-          for(int j = 1; j < stack.size(); j++){
-            tokens.push_back(stack[j]);
-          }
-          for(int i = 0; i < SYNTAX_LIST.size(); i++){
-            string name = SYNTAX_LIST[i];
-            SYNTAX syntax = SYNTAX_MAP[name];
-            if(!pattern_match_syntax(syntax, tokens, TYPE_MAPS[CURRENT_FN]))continue;
-            NODE code_node = CODE_NODE(name, tokens);
-            tokens.clear();
-            break;
-          }
-        }
-        else{
-          if(TREE[NODE_INDEX-1].TYPE=="CODE"){
-            string type = SYNTAX_MAP[TREE[NODE_INDEX-1].DATA[0]].OUT_TYPE;
-            DECLARE_VAR(stack[0], type, CURRENT_FN);
-            NODE var_node = VAR_EXPR_NODE(stack[0], type);
-            ATT_NODE(NODE_INDEX-1,NODE_INDEX-2);
-            ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-            stack.clear();
-          }
-          else{
-            cerr << "VAR ASSIGN TO '" << stack[0] << "', EXPRESSION INVALID!\n";
-            cerr << "THE GIVEN EXPRESSION WAS TOKENIZED AS '";
-            vector<string> tokens;
-            for(int j = 1; j < stack.size(); j++){
-              tokens.push_back(stack[j]);
-            }
-            for(string &s: tokens){
-              cerr << s << " ";
-            }
-            cerr << "'.\n";
-            assert(false);
-          }
-        }
+      else if(block[0]=='e'&&block[1]=='l'&&block[2]=='s'&&block[3]=='e'){
+        block = "else";
       }
-      else if(STATE == "VAR_FUNC"){
-        if(tk != "OP")
-        stack.push_back(tk);
-        if(tk == "CP"){
-          STATE = "VAR_FUNC_END";
-          string var = stack[0];
-          stack.erase(stack.begin());
-          NODE called_fn = FN_CALL_NODE(stack, "PTR");
-          stack.clear();
-          stack.push_back(var);
-        }
-        else if(tk != "OP") stack.push_back(tk);
-      }
-      else if(STATE == "VAR_FUNC_END"){
-        string type = "PTR";
-        DECLARE_VAR(stack[0], type, CURRENT_FN);
-        NODE var_node = VAR_EXPR_NODE(stack[0], type);
-        ATT_NODE(NODE_INDEX-1,NODE_INDEX-2);
-        ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-        stack.clear();
-      }
-      else if(tk == "LET"){
-        STATE = "VAR_START";
-      }
+      TK_STREAM[i].second = block;
     }
-    
-    void if_handler(string &tk){
-      if(STATE == "IF_STATEMENT"){
-        if(tk == "CP"){
-          IF_NODE(stack);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          BLOCK_STACK.push_back(NODE_INDEX-1);
-          stack.clear();
-          STATE = "IF_STATEMENT_END";
-        }
-        else if(tk != "OP"){
-          stack.push_back(tk);
-        }
-      }
-      else if(STATE == "ELIF_STATEMENT"){
-        if(tk == "CP"){
-          ELIF_NODE(stack);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          BLOCK_STACK.push_back(NODE_INDEX-1);
-          stack.clear();
-          STATE = "ELIF_STATEMENT_END";
-        }
-        else if(tk != "OP"){
-          stack.push_back(tk);
-        }
-      }
-      else if(tk == "IF"){
-        STATE = "IF_STATEMENT";
-      }
-      else if(tk == "ELIF"){
-        STATE = "ELIF_STATEMENT";
-      }
-      else if(tk == "ELSE"){
-        STATE = "ELSE_STATEMENT";
-        ELSE_NODE();
-        ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-        BLOCK_STACK.push_back(NODE_INDEX-1);
-      }
-    }
-    
-    void loop_handler(string &tk){
-      if(STATE == "LOOP"){
-        if(tk == "CP"){
-          LOOP_NODE(stack);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          BLOCK_STACK.push_back(NODE_INDEX-1);
-          stack.clear();
-          STATE = "LOOP_END";
-        }
-        else if(tk != "OP"){
-          stack.push_back(tk);
-        }
-      }
-      else if(tk == "LOOP"){
-        STATE = "LOOP";
-      }
-      else if(tk == "BREAK"){
-        STATE = "BREAK";
-        int loop = TRAVERSE_TREE(BLOCK_STACK[BLOCK_STACK.size()-1], "LOOP");
-        BREAK_NODE(loop);
-        ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-        
-      }
-    }
-    
-    void code_handler(string &tk){
-      if(STATE == "NONE"){
-        stack.push_back(tk);
-        for(int i = 0; i < SYNTAX_LIST.size(); i++){
-          string name = SYNTAX_LIST[i];
-          SYNTAX syntax = SYNTAX_MAP[name];
-          if(!pattern_match_syntax(syntax, stack, TYPE_MAPS[CURRENT_FN]))continue;
-          NODE code_node = CODE_NODE(name, stack);
-          ATT_NODE(BLOCK_STACK[BLOCK_STACK.size()-1], NODE_INDEX-1);
-          stack.clear();
-          break;
-        }
-      }
-    }
-    
-    void fn_list_init(){
-      FN_LIST["WRITE"]=-1;
-      FN_LIST["PNL"]=-1;
-      FN_LIST["SYSCALL"]=-1;
-      FN_LIST["GET_PTR"]=-1;
-    }
-};
+  }
+  if(BLOCK_STACK.size()>0){
+    cout << BLOCK_STACK.size() << "\n";
+    cerr << "\033[1;31mERROR: UNCLOSED BLOCK DETECTED!\033[0m\n";
+    assert(false);
+  }
+}
 
-class COMPILER{
-  public:
-    ofstream out_stream;
-    vector<string> PRINT_ON_BLOCK_END;
-    NODE BLOCK_NODE;
-    int BLOCK_NODE_INDEX;
-    int CURRENT_FN = 0;
-    int FN_ITER = 0;
-    int FN_ITER_MAX = 0;
-    int ESC_L = 0;
-    int ESC_LOOP = 0;
-    vector<NODE> STRING_DEFS;
-    vector<int> BLOCK_STACK;
-    unordered_map<string, int> PTR_MAP;
-    unordered_map<string, string> TYPE_MAP;
-    
-    COMPILER (string &wf){
-      out_stream.open(wf);
+// CRINGE, OUT DATED, AND WHO NEEDS AN ACTUALLY TYPE SAFE LANGUAGE ANYWAY
+// void CHECK_GRAMMER_WITH_TYPES(){
+//   for(int i = 0; i < TK_STREAM.size(); i++){
+//     pair<string, string> cur = TK_STREAM[i];
+//     if(cur.first=="+"){
+//       string type = literal_or_var(cur.second);
+//       if(type == "ID") type = VAR_TYPE[cur.second];
+//       if(type != "UINT"){
+//         cerr << "\033[1;31mFIRST ARG OF PLUS IS NOT A UINT\033[0m\n";
+//         assert(false);
+//       }
+//       string type2 = literal_or_var(TK_STREAM[++i].first);
+//       if(type == "ID") type = VAR_TYPE[TK_STREAM[i].first];
+//       if(type != "UINT"){
+//         cerr << "\033[1;31mFIRST ARG OF PLUS IS NOT A UINT\033[0m\n";
+//         assert(false);
+//       }
+//     }
+//   }
+// }
+
+void PRESCAN(vector<string> &INTER){
+  string CF = "global";
+  for(int i = 0; i < INTER.size(); i++){
+    if(INTER[i]=="Label:"){
+      string block = INTER[++i];
+      if(block!="if"&&block!="else"&&block!="loop") CF = block;
     }
-    
-    void run(){
-      BLOCK_STACK.push_back(0);
-      init();
-      parse_tree();
-      _exit();
-      out_stream.close();
+    else if(INTER[i]=="call"){
+      CALL_AMOUNT_MAPS[CF]++;
     }
-    
-  private:
-    void init(){
+  }
+}
+
+void INTER_ASSIGN_FROM_ADDR(string &var, string size, string &ptr, vector<string> &INTER, int &i){
+  i+=2;
+  INTER.push_back(var);
+  INTER.push_back("<--");
+  INTER.push_back(";");
+  INTER.push_back("addr_get");
+  INTER.push_back(size);
+  INTER.push_back(ptr);
+  INTER.push_back(";");
+}
+
+void INTER_OP(string &sym, int op_code, string &var, vector<string> &INTER, int &i){
+  i++;
+  int arg_length = OPS[sym][op_code].size()-1;
+  INTER.push_back(var);
+  INTER.push_back("=");
+  INTER.push_back(TK_STREAM[i].first);
+  INTER.push_back(TK_STREAM[i].second);
+  for(int j = 0; j < arg_length; j++){
+    INTER.push_back(TK_STREAM[++i].first);
+  }
+  INTER.push_back(";");
+}
+
+vector<string> INTERMEDIATE(){
+  vector<string> INTER;
+  string CF;
+  for(int i = 0; i < TK_STREAM.size(); i++){
+    pair<string, string> cur = TK_STREAM[i];
+    if(cur.first=="let"){
+      string type = VAR_TYPE[cur.second];
+      string value = TK_STREAM[i+1].first;
+      INTER.push_back("def");
+      INTER.push_back(cur.second);
+      
+      if(type == "UINT"){
+        INTER.push_back("4");
+        if(OPS.find(value) != OPS.end()){
+          INTER.push_back(";");
+          INTER_OP(value, stoi(TK_STREAM[i+1].second), cur.second, INTER, i);
+        }
+        else if(RET_FNS.find(value) != RET_FNS.end()){
+          INTER.push_back(";");
+          INTER.push_back(cur.second);
+          INTER.push_back("<--");
+          INTER.push_back(";");
+          cur = TK_STREAM[++i];
+        }
+        else if(TK_STREAM[i+1].first=="@"){
+          INTER.push_back(";");
+          INTER_ASSIGN_FROM_ADDR(cur.second, "4", TK_STREAM[i+2].first, INTER, i);
+        }
+        else{
+          INTER.push_back(value);
+          INTER.push_back(";");
+        }
+      }
+      else if(type == "CHAR"){
+        INTER.push_back("1");
+        if(OPS.find(value) != OPS.end()){
+          INTER.push_back(";");
+          INTER_OP(value, stoi(TK_STREAM[i+1].second), cur.second, INTER, i);
+        }
+        else if(RET_FNS.find(value) != RET_FNS.end()){
+          INTER.push_back(";");
+          INTER.push_back(cur.second);
+          INTER.push_back("<--");
+          INTER.push_back(";");
+          cur = TK_STREAM[++i];
+        }
+        else if(TK_STREAM[i+1].first=="@"){
+          INTER.push_back(";");
+          INTER_ASSIGN_FROM_ADDR(cur.second, "1", TK_STREAM[i+2].first, INTER, i);
+        }
+        else{
+          INTER.push_back(value);
+          INTER.push_back(";");
+        }
+      }
+      else if(type == "BOOL"){
+        INTER.push_back("1");
+        if(OPS.find(value) != OPS.end()){
+          INTER.push_back(";");
+          INTER_OP(value, stoi(TK_STREAM[i+1].second), cur.second, INTER, i);
+        }
+        else if(RET_FNS.find(value) != RET_FNS.end()){
+          INTER.push_back(";");
+          INTER.push_back(cur.second);
+          INTER.push_back("<--");
+          INTER.push_back(";");
+          cur = TK_STREAM[++i];
+        }
+        else if(TK_STREAM[i+1].first=="@"){
+          INTER.push_back(";");
+          INTER_ASSIGN_FROM_ADDR(cur.second, "1", TK_STREAM[i+2].first,INTER , i);
+        }
+        else{
+          if(value == "true" || value == "false") INTER.push_back(value);
+          INTER.push_back(";");
+        }
+      }
+      else if(type == "PTR"){
+        PTR_AMOUNT_MAPS[CF]++;
+        BYTE_MAP[CF]+=8;
+        PTR_MAPS[CF][cur.second] = BYTE_MAP[CF];
+        VAR_SIZE_MAPS[CF][cur.second] = "8";
+        INTER.push_back("8");
+        if(OPS.find(value) != OPS.end()){
+          INTER.push_back(";");
+          INTER_OP(value, stoi(TK_STREAM[i+1].second), cur.second, INTER, i);
+        }
+        else if(RET_FNS.find(value) != RET_FNS.end()){
+          INTER.push_back(";");
+          INTER.push_back(cur.second);
+          INTER.push_back("<--");
+          INTER.push_back(";");
+          cur = TK_STREAM[++i];
+        }
+        else if(TK_STREAM[i+1].first=="@"){
+          INTER.push_back(";");
+          INTER_ASSIGN_FROM_ADDR(cur.second, "8", TK_STREAM[i+2].first,INTER , i);
+        }
+        else{
+          INTER.push_back(value);
+          INTER.push_back(";");
+          i++;
+        }
+      }
+    }
+    else if(cur.first=="fn"){
+      string label = cur.second;
+      if(label=="main"){
+        label = "_start";
+      }
+      CF = label;
+      INTER.push_back("Label:");
+      INTER.push_back(label);
+      pair<string, string> buff = TK_STREAM[++i];
+      if(buff.first != "("){
+        cerr << "\033[1;31m"<<"FUNCTION '"<<cur.second<<"' HAS NO OPEN PAREN TO START ARGS LIST!"<<"\033[0m\n";
+        assert(false);
+      }
+      INTER.push_back(";");
+      buff = TK_STREAM[++i];
+      while(buff.first != ")"){
+        // FOR ARGS FIRST WILL BE TYPE
+        // SECOND WILL BE NAME
+        INTER.push_back("arg");
+        INTER.push_back(buff.second);
+        if(buff.first=="STRING"){
+          // [TODO!] STRING IMP
+        }
+        else INTER.push_back(to_string(TYPE_BITS[buff.first]));
+        VAR_TYPE[buff.second]=buff.first;
+        INTER.push_back(";");
+        buff = TK_STREAM[++i];
+      }
+    }
+    else if(cur.first=="end"){
+      INTER.push_back("end");
+      if(cur.second=="loop"||cur.second=="if"||cur.second=="else"||cur.second=="elif"){
+        INTER.push_back(cur.second);
+      }
+      INTER.push_back(";");
+    }
+    else if(cur.first=="loop" || cur.first=="if"){
+      INTER.push_back("Label:");
+      INTER.push_back(cur.first);
+      INTER.push_back(cur.second);
+      INTER.push_back(";");
+      if(TK_STREAM[++i].first != "("){
+        cerr << "\033[1;31m"<<"LOOP/IF WITH THE ID OF '"<<cur.second<<"' HAS NO OPEN PAREN TO START ARGS LIST!"<<"\033[0m\n";
+        assert(false);
+      }
+      INTER.push_back("con");
+      string type = literal_or_var(TK_STREAM[++i].first);
+      if(OPS.find(TK_STREAM[i].first) != OPS.end()){
+        INTER.push_back(TK_STREAM[i].first);//COMPARISON
+        INTER.push_back(TK_STREAM[i].second);//ID
+        INTER.push_back(TK_STREAM[++i].first);//A
+        INTER.push_back(TK_STREAM[++i].first);//B
+      }
+      else{
+        if(type == "ID"){
+          type = VAR_TYPE[TK_STREAM[i].first];
+        }
+        if(type == "BOOL"){
+          INTER.push_back(TK_STREAM[i].first);//BOOL
+        }
+      }
+      INTER.push_back(";");
+    }
+    else if(cur.first=="else"){
+      INTER.push_back("Label:");
+      INTER.push_back(cur.first);
+      INTER.push_back(cur.second);
+      INTER.push_back(";");
+    }
+    else if(cur.first=="ret"){
+      INTER.push_back("out");
+      INTER.push_back(TK_STREAM[++i].first);
+      INTER.push_back("to");
+      string reg;
+      string type = literal_or_var(TK_STREAM[i].first);
+      if(type=="ID"){
+        type = VAR_TYPE[TK_STREAM[i].first];
+      }
+      int size = TYPE_BITS[type];
+      if(size == 8) reg = "rax";
+      else if(size == 4) reg = "eax";
+      else if(size == 1) reg = "al";
+      INTER.push_back(reg);
+      INTER.push_back(";");
+      INTER.push_back("ret");
+      INTER.push_back(";");
+    }
+    else if(cur.first=="@"){
+      string type = cur.second;
+      string ptr = TK_STREAM[++i].first;
+      string value = TK_STREAM[++i].first;
+      INTER.push_back("addr_equ");
+      INTER.push_back(to_string(TYPE_BITS[type]));
+      INTER.push_back(ptr);
+      INTER.push_back(value);
+      INTER.push_back(";");
+    }
+    else if(VAR_TYPE.find(cur.first)!=VAR_TYPE.end()){
+      if(find(NATIVE_FNS.begin(), NATIVE_FNS.end(), TK_STREAM[i+1].first) != NATIVE_FNS.end() || find(FN_LIST.begin(), FN_LIST.end(), TK_STREAM[i+1].first) != FN_LIST.end()){
+        INTER.push_back(cur.first);
+        INTER.push_back("<--");
+        INTER.push_back(";");
+      }
+      else if(TK_STREAM[i+1].first=="@"){
+        INTER_ASSIGN_FROM_ADDR(cur.first, to_string(TYPE_BITS[TK_STREAM[i+1].second]), TK_STREAM[i+2].first, INTER, i);
+      }
+      else{
+        string type = VAR_TYPE[cur.first];
+        if(OPS.find(TK_STREAM[i+1].first) != OPS.end()){
+          INTER_OP(TK_STREAM[i+1].first, stoi(TK_STREAM[i+1].second), cur.first, INTER, i);
+        }
+        else{
+          INTER.push_back(cur.first);
+          INTER.push_back("=");
+          INTER.push_back(TK_STREAM[++i].first);
+          INTER.push_back(";");
+        }
+      }
+    }
+    else if(OPS.find(cur.first) != OPS.end()){
+      string op = cur.first;
+      int op_id = stoi(cur.second);
+      INTER.push_back(cur.first);
+      INTER.push_back(cur.second);
+      for(int j = 0; j < OPS[cur.first][op_id].size()-1; j++){
+        INTER.push_back(TK_STREAM[++i].first);
+      }
+      INTER.push_back(";");
+    }
+    if(find(FN_LIST.begin(), FN_LIST.end(), cur.first) != FN_LIST.end()){
+      if(TK_STREAM[++i].first!="("){
+        cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF '"<<cur.first<<"'.\033[0m\n";
+        assert(false);
+      }
+      pair<string, string> buff = TK_STREAM[++i];
+      while(buff.first != ")"){
+        // FOR ARGS FIRST WILL BE TYPE
+        // SECOND WILL BE NAME
+        INTER.push_back("in");
+        string type = literal_or_var(buff.first);
+        if(type == "ID"){
+          type = VAR_TYPE[buff.first];
+        }
+        INTER.push_back(to_string(TYPE_BITS[type]));
+        INTER.push_back(buff.first);
+        INTER.push_back(";");
+        buff = TK_STREAM[++i];
+      }
+      INTER.push_back("call");
+      INTER.push_back(cur.first);
+      INTER.push_back(";");
+    }
+    else if(find(NATIVE_FNS.begin(), NATIVE_FNS.end(), cur.first) != NATIVE_FNS.end()){
+      if(cur.first=="write" || cur.first=="writeln"){
+        string label = "WRITE_";
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'WRITE'.\033[0m\n";
+          assert(false);
+        }
+        string fd = "1";
+        string value = TK_STREAM[++i].first;
+        string type = literal_or_var(value);
+        if(type == "ID"){
+          if(VAR_TYPE.find(value)!=VAR_TYPE.end()) type = VAR_TYPE[value];
+          else if(DATA_TYPES.find(value)!=DATA_TYPES.end()) type = DATA_TYPES[value];
+        }
+        if(type == "UINT" && TK_STREAM[i+1].first!=")"){
+          fd = value;
+          value = TK_STREAM[++i].first;
+          type = literal_or_var(value);
+          if(type == "ID"){
+            if(VAR_TYPE.find(value)!=VAR_TYPE.end()) type = VAR_TYPE[value];
+            else if(DATA_TYPES.find(value)!=DATA_TYPES.end()) type = DATA_TYPES[value];
+          }
+        }
+        label+=type;
+        if(type == "PTR"){
+          INTER.push_back("in");
+          INTER.push_back("8");
+          INTER.push_back(value);
+          INTER.push_back("to");
+          INTER.push_back("rsi");
+          INTER.push_back(";");
+          if(literal_or_var(TK_STREAM[++i].first)=="UINT" || DATA_TYPES.find(TK_STREAM[i].first)!=DATA_TYPES.end()) INTER.push_back("in");
+          else INTER.push_back("insx");
+          INTER.push_back("4");
+          INTER.push_back(TK_STREAM[i].first);
+          INTER.push_back("to");
+          INTER.push_back("rdx");
+          INTER.push_back(";");
+          INTER.push_back("in");
+          INTER.push_back("4");
+          INTER.push_back(fd);
+          INTER.push_back("to");
+          INTER.push_back("edi");
+          INTER.push_back(";");
+          INTER.push_back("call");
+          INTER.push_back(label);
+          INTER.push_back(";");
+        }
+        else if(type == "STRING"){
+          INTER.push_back("asm");
+          INTER.push_back("out");
+          INTER.push_back("rsi");
+          INTER.push_back("    lea rsi, ");
+          INTER.push_back("@");
+          INTER.push_back(value);
+          INTER.push_back("\n");
+          INTER.push_back(";");
+          INTER.push_back("in");
+          INTER.push_back("4");
+          INTER.push_back(value+".len");
+          INTER.push_back("to");
+          INTER.push_back("rdx");
+          INTER.push_back(";");
+          INTER.push_back("in");
+          INTER.push_back("4");
+          INTER.push_back(fd);
+          INTER.push_back("to");
+          INTER.push_back("edi");
+          INTER.push_back(";");
+          INTER.push_back("call");
+          INTER.push_back("WRITE_PTR");
+          INTER.push_back(";");
+        }
+        else{
+          INTER.push_back("in");
+          INTER.push_back(to_string(TYPE_BITS[type]));
+          INTER.push_back(value);
+          INTER.push_back(";");
+          INTER.push_back("in");
+          INTER.push_back("4");
+          INTER.push_back(fd);
+          INTER.push_back(";");
+          INTER.push_back("call");
+          INTER.push_back(label);
+          INTER.push_back(";");
+          i++;
+        }
+        if(cur.first=="writeln"){
+          INTER.push_back("in");
+          INTER.push_back("4");
+          INTER.push_back(fd);
+          INTER.push_back("to");
+          INTER.push_back("eax");
+          INTER.push_back(";");
+          INTER.push_back("call");
+          INTER.push_back("WRITE_NEW_LINE");
+          INTER.push_back(";");
+        }
+      }
+      else if(cur.first=="new_line"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'new_line'.\033[0m\n";
+          assert(false);
+        }
+        string fd = TK_STREAM[++i].first != ")" ? TK_STREAM[i++].first : "1";
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back("eax");
+        INTER.push_back(";");
+        INTER.push_back("call");
+        INTER.push_back("WRITE_NEW_LINE");
+        INTER.push_back(";");
+        if(TK_STREAM[i].first!=")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'new_line'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="syscall"){
+        int arg_count = 0;
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'syscall'.\033[0m\n";
+          assert(false);
+        }
+        i++;
+        while(TK_STREAM[i].first!=")"){
+          string value = TK_STREAM[i].first;
+          string type = literal_or_var(value);
+          if(type == "ID"){
+            type = VAR_TYPE[value];
+          }
+          int size = TYPE_BITS[type];
+          if(size != 8){
+            INTER.push_back("insx");
+          }
+          else INTER.push_back("in");
+          INTER.push_back(to_string(size));
+          INTER.push_back(value);
+          INTER.push_back("to");
+          INTER.push_back(SYSCALL_ARGS[arg_count]);
+          INTER.push_back(";");
+          i++;
+          arg_count++;
+        }
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+      }
+      else if(cur.first=="ptr"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'ptr'.\033[0m\n";
+          assert(false);
+        }
+        string value = TK_STREAM[++i].first;
+        string type = literal_or_var(value);
+        if(type == "ID"){
+          type = VAR_TYPE[value];
+        }
+        else{
+          cerr << "\033[1;31mPUT NON-VAR INTO 'ptr' FUNCTION.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("asm");
+        INTER.push_back("out");
+        INTER.push_back("rax");
+        INTER.push_back("    lea rax, ");
+        INTER.push_back("@");
+        INTER.push_back(value);
+        INTER.push_back("\n");
+        INTER.push_back(";");
+        i++;
+      }
+      else if(cur.first=="len"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'ptr'.\033[0m\n";
+          assert(false);
+        }
+        string value = TK_STREAM[++i].first;
+        string type = literal_or_var(value);
+        if(DATA_TYPES.find(value)==DATA_TYPES.end()){
+          cerr << "\033[1;31mDON'T PUT NON-CONST INTO 'len' FUNCTION.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("asm");
+        INTER.push_back("out");
+        INTER.push_back("eax");
+        INTER.push_back("    mov eax, ");
+        INTER.push_back(value+".len");
+        INTER.push_back("\n");
+        INTER.push_back(";");
+        i++;
+      }
+      else if(cur.first=="array"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'array'.\033[0m\n";
+          assert(false);
+        }
+        string type = TK_STREAM[++i].first;
+        string amount = TK_STREAM[i].second;
+        INTER.push_back("alloc");
+        INTER.push_back(to_string(TYPE_BITS[type] * stoi(amount)));
+        INTER.push_back(";");
+        
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'array'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="alloc"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'alloc'.\033[0m\n";
+          assert(false);
+        }
+        string bytes = TK_STREAM[++i].first;
+        INTER.push_back("alloc");
+        INTER.push_back(bytes);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'alloc'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="dealloc"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'dealloc'.\033[0m\n";
+          assert(false);
+        }
+        string bytes = TK_STREAM[++i].first;
+        INTER.push_back("dealloc");
+        INTER.push_back(bytes);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'dealloc'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="addr_sub"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'addr_sub'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("addr_sub");
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'addr_sub'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="addr_add"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'addr_add'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("addr_add");
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'addr_add'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="addr_get"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'addr_get'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("addr_get");
+        INTER.push_back(to_string(TYPE_BITS[TK_STREAM[++i].first]));
+        INTER.push_back(TK_STREAM[i].second);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'addr_get'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="addr_equ"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'addr_equ'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("addr_equ");
+        INTER.push_back(to_string(TYPE_BITS[TK_STREAM[++i].first]));
+        INTER.push_back(TK_STREAM[i].second);
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'addr_equ'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="sleep"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'sleep'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("sleep");
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'sleep'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="error"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'error'.\033[0m\n";
+          assert(false);
+        }
+        string ptr = TK_STREAM[++i].first;
+        string length = TK_STREAM[++i].first;
+        string fd = "2";
+        
+        INTER.push_back("in");
+        INTER.push_back("8");
+        INTER.push_back(ptr);
+        INTER.push_back("to");
+        INTER.push_back("rsi");
+        INTER.push_back(";");
+        if(literal_or_var(length)=="UINT" || DATA_TYPES.find(length)!=DATA_TYPES.end()) INTER.push_back("in");
+        else INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(length);
+        INTER.push_back("to");
+        INTER.push_back("rdx");
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back("edi");
+        INTER.push_back(";");
+        INTER.push_back("call");
+        INTER.push_back("WRITE_PTR");
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back("eax");
+        INTER.push_back(";");
+        INTER.push_back("call");
+        INTER.push_back("WRITE_NEW_LINE");
+        INTER.push_back(";");
+        
+        string error_code = TK_STREAM[++i].first;
+        if(literal_or_var(error_code)=="UINT" || DATA_TYPES.find(error_code)!=DATA_TYPES.end()) INTER.push_back("in");
+        else INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(error_code);
+        INTER.push_back("to");
+        INTER.push_back("rdi");
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back("60"); //EXIT SYSCALL
+        INTER.push_back("to");
+        INTER.push_back("rax");
+        INTER.push_back(";");
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'error'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="exit"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'exit'.\033[0m\n";
+          assert(false);
+        }
+        string error_code = TK_STREAM[++i].first;
+        if(literal_or_var(error_code)=="UINT" || DATA_TYPES.find(error_code)!=DATA_TYPES.end()) INTER.push_back("in");
+        else INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(error_code);
+        INTER.push_back("to");
+        INTER.push_back("rdi");
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back("60"); //EXIT SYSCALL
+        INTER.push_back("to");
+        INTER.push_back("rax");
+        INTER.push_back(";");
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'exit'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="cast"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'cast'.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("cast");
+        INTER.push_back(TK_STREAM[++i].first);
+        INTER.push_back(TK_STREAM[i].second);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'cast'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="read_bits"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'read_bits'.\033[0m\n";
+          assert(false);
+        }
+        string value = TK_STREAM[++i].first;
+        string buffer = TK_STREAM[++i].first;
+        string type = literal_or_var(value);
+        if(type=="ID"){
+          if(VAR_TYPE.find(value)!=VAR_TYPE.end()) type = VAR_TYPE[value];
+          else if(DATA_TYPES.find(value)!=DATA_TYPES.end()) type = DATA_TYPES[value];
+        }
+        INTER.push_back("in");
+        INTER.push_back(to_string(TYPE_BITS[type]));
+        INTER.push_back(value);
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back(to_string(TYPE_BITS[type]*8));
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("8");
+        INTER.push_back(buffer);
+        INTER.push_back(";");
+        INTER.push_back("call");
+        INTER.push_back("@READ_BITS");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'read_bits'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="open_fd"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'open_fd'.\033[0m\n";
+          assert(false);
+        }
+        string filename = TK_STREAM[++i].first;
+        string flags = TK_STREAM[++i].first;
+        string mode = TK_STREAM[++i].first;
+        if(DATA_TYPES.find(filename)==DATA_TYPES.end()){
+          if(DATA_TYPES[filename]!="STRING"){
+            cerr << "\033[1;31mFILENAME IN FN CALL OF 'open_fd' IS NOT A STRING.\033[0m\n";
+          }
+        }
+        string type = literal_or_var(mode);
+        if(type == "ID"){
+          if(VAR_TYPE.find(mode)!=DATA_TYPES.end()) type = VAR_TYPE[mode];
+          else if(DATA_TYPES.find(mode)!=DATA_TYPES.end()) type = DATA_TYPES[mode];
+        }
+        if(type != "UINT"){
+          cerr << "\033[1;MODE IN FN CALL OF 'open_fd' IS NOT A UINT.\033[0m\n";
+        }
+        INTER.push_back("open_fd");
+        INTER.push_back(filename);
+        INTER.push_back(flags);
+        INTER.push_back(mode);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first!=")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'open_fd'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="close_fd"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'close_fd'.\033[0m\n";
+          assert(false);
+        }
+        string fd = TK_STREAM[++i].first;
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back("3");
+        INTER.push_back("to");
+        INTER.push_back("eax");
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back("edi");
+        INTER.push_back(";");
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first!=")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'close_fd'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="read"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'read'.\033[0m\n";
+          assert(false);
+        }
+        string fd = TK_STREAM[i+1].first;
+        string type = literal_or_var(fd);
+        if(type == "ID"){
+          if(VAR_TYPE.find(fd)!=DATA_TYPES.end()) type = VAR_TYPE[fd];
+          else if(DATA_TYPES.find(fd)!=DATA_TYPES.end()) type = DATA_TYPES[fd];
+        }
+        fd = type == "UINT" ? TK_STREAM[++i].first : "1";
+        string buffer = TK_STREAM[++i].first;
+        string count = TK_STREAM[++i].first;
+        cout << "COUNT: " << count << "\nBUFFER: " << buffer << "\nFD: " << fd << "\n";
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back("0");
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[0]);
+        INTER.push_back(";");
+        if(literal_or_var(fd)=="UINT" || DATA_TYPES.find(fd)!=DATA_TYPES.end()) INTER.push_back("in");
+        else INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[1]);
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("8");
+        INTER.push_back(buffer);
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[2]);
+        INTER.push_back(";");
+        if(literal_or_var(count)=="UINT" || DATA_TYPES.find(count)!=DATA_TYPES.end()) INTER.push_back("in");
+        else INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(count);
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[3]);
+        INTER.push_back(";");
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first!=")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'read'.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(cur.first=="fstats"){
+        if(TK_STREAM[++i].first!="("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'fstats'.\033[0m\n";
+          assert(false);
+        }
+        string fd = TK_STREAM[++i].first;
+        string buffer = TK_STREAM[++i].first; // BUFFER SHOULD BE 144 BYTES
+        INTER.push_back("in");
+        INTER.push_back("4");
+        INTER.push_back("5");
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[0]);
+        INTER.push_back(";");
+        INTER.push_back("insx");
+        INTER.push_back("4");
+        INTER.push_back(fd);
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[1]);
+        INTER.push_back(";");
+        INTER.push_back("in");
+        INTER.push_back("8");
+        INTER.push_back(buffer);
+        INTER.push_back("to");
+        INTER.push_back(SYSCALL_ARGS[2]);
+        INTER.push_back(";");
+        INTER.push_back("syscall");
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first!=")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'fstats'.\033[0m\n";
+          assert(false);
+        }
+      }
+    }
+  }
+  INTER.push_back("SECTION");
+  INTER.push_back(".DATA");
+  INTER.push_back(";");
+  for(pair<string, string> &c : DATA){
+    string type = DATA_TYPES[c.first];
+    if(type == "STRING"){
+      INTER.push_back(c.first);
+      INTER.push_back(" db ");
+      INTER.push_back(c.second);
+      INTER.push_back("\n");
+    }
+    else if(type == "UINT"){
+      INTER.push_back(c.first);
+      if(isNumber(c.second)) INTER.push_back(" dd ");
+      INTER.push_back(c.second);
+      INTER.push_back("\n");
+    }
+    else if(type =="CHAR"){
+      INTER.push_back(c.first);
+      INTER.push_back(" db ");
+      INTER.push_back(c.second);
+      INTER.push_back("\n");
+    }
+    else if(type =="BOOL"){
+      INTER.push_back(c.first);
+      INTER.push_back(" db ");
+      if(c.second=="true") INTER.push_back("1");
+      else INTER.push_back("0");
+      INTER.push_back("\n");
+    }
+    else if(type =="ID"){
+      cerr << "\033[1;31mCANNOT ASSIGN CONST '"<< c.first <<"' TO THE VAR '"<< c.second <<"'!\033[0m\n";
+      assert(false);
+    }
+    else{
+      cerr << "\033[1;31mCANNOT ASSIGN CONST '"<< c.first <<"' TO THE UNHANDLED TYPE OF '"<< type <<"'!\033[0m\n";
+      assert(false);
+    }
+  }
+  INTER.push_back("/ESC/");
+  INTER.push_back("SECTION");
+  INTER.push_back(".BSS");
+  INTER.push_back(";");
+  for(string &s : BSS){
+    INTER.push_back(s);
+  }
+  INTER.push_back("/ESC/");
+  return INTER;
+}
+
+string COMPILE_OP(int &i, string &tk, vector <string> &INTER, ofstream &out_stream, unordered_map<string, int> &ptr_map){
+  if(!isNumber(INTER[++i])) cerr << "NOT NUMBER: "<< INTER[i] << "\n";
+  int id = stoi(INTER[i]);
+  if(tk=="+"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
       out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) <<"\n"
+      "    add eax, "<< asm_get_value(b, ptr_map) <<"\n";
+      i++;
+      return "eax";
+    }
+    else if(id==1){
+      string ptr = INTER[++i];
+      string additive = INTER[++i];
+      out_stream <<
+      "    mov rax, " << asm_get_value(ptr, ptr_map) << "\n";
+      if(literal_or_var(additive)=="ID"){
+        out_stream <<
+        "    movsx rdx, " << asm_get_value(additive, ptr_map) << "\n"
+        "    add rax, rdx\n";
+      }
+      else{
+        out_stream <<
+        "    add rax, " << additive << "\n";
+      }
+      i++;
+      return "rax";
+    }
+    else if(id==2){
+      string additive = INTER[++i];
+      string ptr = INTER[++i];
+      out_stream <<
+      "    mov rax, " << asm_get_value(ptr, ptr_map) << "\n";
+      if(literal_or_var(additive)=="ID"){
+        out_stream <<
+        "    movsx rdx, " << asm_get_value(additive, ptr_map) << "\n"
+        "    add rax, rdx\n";
+      }
+      else{
+        out_stream <<
+        "    add rax, " << additive << "\n";
+      }
+      i++;
+      return "rax";
+    }
+  }
+  else if(tk=="-"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) <<"\n"
+      "    sub eax, "<< asm_get_value(b, ptr_map) <<"\n";
+      i++;
+      return "eax";
+    }
+    else if(id==1){
+      string ptr = INTER[++i];
+      string subtactor = INTER[++i];
+      out_stream <<
+      "    mov rax, " << asm_get_value(ptr, ptr_map) << "\n";
+      if(literal_or_var(subtactor)=="ID"){
+        out_stream <<
+        "    movsx rdx, " << asm_get_value(subtactor, ptr_map) << "\n"
+        "    add rax, rdx\n";
+      }
+      else{
+        out_stream <<
+        "    sub rax, " << subtactor << "\n";
+      }
+      i++;
+      return "rax";
+    }
+  }
+  else if(tk=="*"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) <<"\n"
+      "    mul "<< asm_get_value(b, ptr_map) <<"\n";
+      i++;
+      return "eax";
+    }
+  }
+  else if(tk=="/"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    xor edx,edx\n"
+      "    mov eax, "<< asm_get_value(a, ptr_map) <<"\n"
+      "    div "<< asm_get_value(b, ptr_map) <<"\n";
+      i++;
+      return "eax";
+    }
+  }
+  else if(tk=="%"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    xor edx,edx\n"
+      "    mov eax, "<< asm_get_value(a, ptr_map) <<"\n"
+      "    div "<< asm_get_value(b, ptr_map) <<"\n";
+      i++;
+      return "edx";
+    }
+  }
+  else if(tk=="++"){
+    if(id==0||id==1){
+      string a = INTER[++i];
+      out_stream <<
+      "    inc "<< asm_get_value(a, ptr_map) << "\n";
+      i++;
+    }
+  }
+  else if(tk=="--"){
+    if(id==0||id==1){
+      string a = INTER[++i];
+      out_stream <<
+      "    dec "<< asm_get_value(a, ptr_map) << "\n";
+      i++;
+    }
+  }
+  else if(tk==">"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setg al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="<"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setl al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="=="){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    sete al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="<="){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setle al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk==">="){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setge al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="!="){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov eax, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp eax, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setne al\n";
+      i++;
+      return "al";
+    }
+    else if(id==1||id==2){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov al, "<< asm_get_value(a, ptr_map) << "\n"
+      "    cmp al, "<< asm_get_value(b, ptr_map) << "\n"
+      "    setne al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="!"){
+    if(id==0){
+      string a = INTER[++i];
+      out_stream <<
+      "    movsx eax, "<<asm_get_value(a, ptr_map) << "\n"
+      "    xor eax, 1\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="&&"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov al, "<< asm_get_value(a, ptr_map) << "\n"
+      "    and al, "<< asm_get_value(b, ptr_map) << "\n"
+      "    shr al, 1\n"
+      "    setc al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="||"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov al, "<< asm_get_value(a, ptr_map) << "\n"
+      "    or al, "<< asm_get_value(b, ptr_map) << "\n"
+      "    shr al, 1\n"
+      "    setc al\n";
+      i++;
+      return "al";
+    }
+  }
+  else if(tk=="-|"){
+    if(id==0){
+      string a = INTER[++i];
+      string b = INTER[++i];
+      out_stream <<
+      "    mov al, "<< asm_get_value(a, ptr_map) << "\n"
+      "    xor al, "<< asm_get_value(b, ptr_map) << "\n"
+      "    shr al, 1\n"
+      "    setc al\n";
+      i++;
+      return "al";
+    }
+  }
+  return "NA";
+}
+
+void COMPILE_CONDITIONAL_JUMP(string &label, vector<string> &condition, ofstream &out_stream, unordered_map<string, int> &ptr_map, bool inverse = false){
+  if(condition[0]!="con"){
+    cerr << "\033[1;31mINPUTTED A NON-CONDITION\033[0m\n";
+    assert(false);
+  }
+  if(condition.size()==3){
+    if(inverse){
+      out_stream <<
+      "    cmp " << asm_get_value(condition[1], ptr_map) << ", 1\n"
+      "    jne ." << label << "\n";
+    }
+    else{
+      out_stream <<
+      "    cmp " << asm_get_value(condition[1], ptr_map) << ", 0\n"
+      "    jne ." << label << "\n";
+    }
+  }
+  else if(OPS.find(condition[1]) != OPS.end()){
+    string jmp = COMP_JMP[condition[1]];
+    if(inverse) jmp = INV_JMP[jmp];
+    if(literal_or_var(condition[4])!="ID"){
+      out_stream <<
+      "    cmp " << asm_get_value(condition[3], ptr_map) << ", " << asm_get_value(condition[4], ptr_map) << "\n"
+      "    " << jmp << " ." << label << "\n";
+    }
+    else{
+      string type;
+      string var = condition[4];
+      if(VAR_TYPE.find(var)!=VAR_TYPE.end()) type = VAR_TYPE[var];
+      if(DATA_TYPES.find(var)!=DATA_TYPES.end()) type = DATA_TYPES[var];
+      int size = TYPE_BITS[type];
+      string reg;
+      if(size==8) reg = "rax";
+      else if(size==4) reg = "eax";
+      else if(size==1) reg = "al";
+      else {
+        cerr << "\033[1;31m'"<< var << "' HAS AN INVALID SIZE OF '" << size << "' AND A TYPE OF '"<< type << "' IN CONDITIONAL JUMP COMPILATION.\033[0m\n";
+        assert(false);
+      }
+      out_stream <<
+      "    mov " << reg << ", " <<asm_get_value(condition[3], ptr_map) << "\n"
+      "    cmp " << reg << ", " << asm_get_value(var, ptr_map) << "\n"
+      "    " << jmp << " ." << label << "\n";
+    }
+  }
+}
+
+void COMPILE(string &wf, vector <string> &INTER){
+  //OPEN FILE
+  ofstream out_stream;
+  out_stream.open(wf);
+  if(!out_stream.is_open()){
+    cerr << "\033[1;31mERROR: CAN'T OPEN/MAKE ASM FILE!\033[0m\n";
+    assert(false);
+  }
+  //INIT
+    out_stream <<
 "SECTION .text		; code section\n"
 "WRITE_UINT:\n"
+"    mov    rbp, rsp\n"
 "    mov    eax, edi\n"
 "    mov    ecx, 0xa\n"
 "    push   rcx\n"
@@ -1538,17 +2025,15 @@ class COMPILER{
 "    jnz  .toascii_digit\n"
 "    mov    eax, 1\n"
 "    mov    edi, 1\n"
-"    lea    edx, [rsp+16 + 1]\n"
+"    lea    edx, [rsp+16]\n"
 "    sub    edx, esi\n"
 "    syscall\n"
-"    add  rsp, 24\n"
+"    add    rsp, 24\n"
 "    ret\n"
-//To make a system call in 64-bit Linux, place the system call number in rax, and its arguments, in order, in rdi, rsi, rdx, r10, r8, and r9, then invoke syscall.
 "WRITE_CHAR:\n"
 "    push rax\n"
-"    ;xor rsi, rsi\n"
 "    mov eax, 1    ;write syscall\n"
-"    mov edi, 1    ;stdout\n"
+"    mov rdi, rsi  ;stdout\n"
 "    mov rsi, rsp  ;get char\n"
 "    mov edx, 1    ;char amount\n"
 "    syscall\n"
@@ -1556,448 +2041,689 @@ class COMPILER{
 "    ret\n"
 "WRITE_NEW_LINE:\n"
 "    push 10\n"
+"    mov rdi, rax  ;outstream\n"
 "    mov eax, 1    ;write syscall\n"
-"    mov edi, 1    ;stdout\n"
 "    mov rsi, rsp  ;get char\n"
 "    mov edx, 1    ;char amount\n"
 "    syscall\n"
 "    pop rax\n"
 "    ret\n"
-"WRITE_STRING:\n"
+"WRITE_PTR:\n" //Actually WRITE_STRING, but the way we generate it we have the name WRITE_PTR
 "    mov eax, 1    ;write syscall\n"
-"    mov edi, 1    ;stdout\n"
 "    syscall\n"
 "    ret\n"
+"WRITE_BOOL:\n"
+"    test al, al\n"
+"    mov rdi, rsi  ;outstream\n"
+"    jz .false\n"
+"    lea rsi, [@TRUE]\n"
+"    mov edx, @TRUELEN\n"
+"    jmp .write\n"
+".false:\n"
+"    lea rsi, [@FALSE]\n"
+"    mov edx, @FALSELEN\n"
+".write:\n"
+"    mov eax, 1    ;write syscall\n"
+"    syscall\n"
+"    ret\n"
+"@READ_BITS:\n" // rdi is val, esi is bytes, rdx is buffer
+"    push 0\n"
+".loop_in:\n"
+"    shl rdi, 1\n"
+"    jnc .azero\n"
+"    pop rcx\n"
+"    mov byte [rdx+rcx], 1\n"
+"    jmp .loop_out\n"
+".azero:\n"
+"    pop rcx\n"
+"    mov byte [rdx+rcx], 0\n"
+".loop_out:\n"
+"    inc rcx\n"
+"    cmp rcx, rsi\n"
+"    jl .loop_in\n"
+"    push rcx\n"
+"    ret\n"
 "global _start		; make label available to linker\n";
-    }
-    
-    void func_node(NODE &x, int y){
-      if(x.DATA[0]=="MAIN"){
+  
+  for(string &s : GLOBAL_FNS){
+    out_stream << "global " << s << "\n";
+  }
+  for(string &s : EXTERN_FNS){
+    out_stream << "extern " << s << "\n";
+  }
+  //INTERPRET
+  string CB; //CURRENT_BLOCK
+  vector<string> BLOCK_STACK;
+  vector<string> STACK;
+  string FNV; //VAR FROM FUNCTION CALL
+  for(int i = 0; i < INTER.size(); i++){
+    string tk = INTER[i];
+    if(tk=="Label:"){
+      if(INTER[++i]=="loop"){
         out_stream <<
-"_start:\n";
-      }else{
-        out_stream <<
-x.DATA[0]<<":\n";
-      }
-      if(TREE_CONECTIONS[0].size()>0){
-         out_stream <<
-"    push rbp\n"
-"    mov rbp, rsp\n";
-        int arg_count = (x.DATA.size()-1)/2;
-        if(arg_count > FUNC_ARG_REGISTER_LIST32.size()){
-          cerr << "NOT ALLOWED MORE THAN " << FUNC_ARG_REGISTER_LIST32.size() << "ARGUMENTS FOR A FUNCTION.\n" <<
-          "ERROR AT FUNCTION '" << x.DATA[0] << "'.\n";
+        "    jmp ." << INTER[i] << INTER[++i] << "_in\n"
+        "." << INTER[i-1] << INTER[i] << "_out:\n";
+        BLOCK_STACK.push_back(INTER[i]);
+        i++;
+        if(INTER[++i]=="con"){
+          int length = 0;
+          while(INTER[i+length]!=";"){
+            length++;
+          }
+          STACK.push_back(";");
+          for(int j = length-1; j >= 1; j--){
+            STACK.push_back(INTER[i+j]);
+          }
+          STACK.push_back("con");
+          i+=length;
+        }
+        else{
+          // cout << INTER[i] << "\n";
+          cerr << "\033[1;31mLOOP WITHOUT A CONDITION.\033[0m\n";
           assert(false);
         }
-        BLOCK_NODE = x;
-        BLOCK_NODE_INDEX = y;
-        CURRENT_FN = y;
-        string var;
-        string type;
-        int BOOL_COUNTER;
-        for(int i = 0; i < arg_count; i++){
-          type = x.DATA[(i*2)+1];
-          var = x.DATA[(i*2)+2];
-          DECLARE_VAR(var, type, y);
-          if(type=="UINT"){
-            out_stream <<
-"    mov "<< get_asm_value(var, PTR_MAPS[y], type) <<", " << FUNC_ARG_REGISTER_LIST32[(arg_count-1)-i]<<";"<<var<<"\n";
+      }
+      else if(INTER[i]=="if"){
+        string label = "if" + INTER[++i];
+        BLOCK_STACK.push_back(INTER[i]);
+        i++;
+        if(INTER[++i]=="con"){
+          vector<string> con;
+          con.push_back("con");
+          while(INTER[++i]!=";"){
+            con.push_back(INTER[i]);
           }
-          else if(type=="BOOL"){
-            if(FUNC_ARG_REGISTER_LIST32[(arg_count-1)-i] == "edx"){
-              out_stream <<
-"    mov "<< get_asm_value(var, PTR_MAPS[y], type) <<", dl;"<<var<<"\n";
+          con.push_back(";");
+          COMPILE_CONDITIONAL_JUMP(label, con, out_stream, PTR_MAPS[CB], true);
+          STACK.push_back(";");
+          STACK.push_back("."+label+":\n");
+        }
+        else{
+          // cout << INTER[i] << "\n";
+          cerr << "\033[1;31mIF WITHOUT A CONDITION.\033[0m\n";
+          assert(false);
+        }
+      }
+      else if(INTER[i]=="else"){
+        string esc_id = to_string(ELSES[stoi(INTER[++i])]);
+        string else_label = ".else" + esc_id;
+        string if_label = STACK[STACK.size()-1];
+        STACK.pop_back();
+        STACK.pop_back();
+        if(STACK[STACK.size()-1]==else_label+":\n"){
+          STACK.pop_back();
+          STACK.pop_back();
+          BLOCK_STACK.pop_back();
+        }
+        BLOCK_STACK.pop_back();
+        BLOCK_STACK.push_back("else");
+        out_stream << "    jmp " << else_label << "\n";
+        out_stream << if_label;
+        STACK.push_back(";");
+        STACK.push_back(else_label+":\n");
+        i++;
+      }
+      else if(INTER[i]=="_start"){
+        out_stream << INTER[i] << ":\n";
+        CB=INTER[i];
+        int local_storage = CALL_AMOUNT_MAPS[CB]*16 + (PTR_AMOUNT_MAPS[CB]%2)*8;
+        out_stream <<
+  "    push rbp\n"
+  "    mov rbp, rsp\n"
+  "    sub rsp, "<< local_storage <<"\n";
+        i++;
+      }
+      else{
+        out_stream << INTER[i] << ":\n";
+        CB=INTER[i];
+        int local_storage = CALL_AMOUNT_MAPS[CB]*16 + (PTR_AMOUNT_MAPS[CB]%2)*8;
+        out_stream <<
+  "    push rbp\n"
+  "    mov rbp, rsp\n"
+  "    sub rsp, "<< local_storage <<"\n";
+        i++;
+        if(INTER[i+1]=="arg"){
+          int arg_count = 0;
+          while(INTER[i+1]=="arg"){
+            i++;
+            string name = INTER[++i];
+            string size = INTER[++i];
+            string reg;
+            if(size == "4"){
+              BYTE_MAP[CB]+=4;
+              reg = FUNC_ARG_REGISTER_LIST32[arg_count];
             }
-            else if(FUNC_ARG_REGISTER_LIST32[(arg_count-1)-i] == "eax"){
+            else if(size == "8"){
+              BYTE_MAP[CB]+=8;
+              reg = FUNC_ARG_REGISTER_LIST64[arg_count];
+            }
+            else if(size == "1"){
+              BYTE_MAP[CB]+=1;
+              reg = FUNC_ARG_REGISTER_LIST8[arg_count];
+            }
+            int PTR = BYTE_MAP[CB];
+            PTR_MAPS[CB][name] = PTR;
+            VAR_SIZE_MAPS[CB][name]=size;
+            out_stream <<
+            "    mov " << asm_var(PTR, stoi(size)) << ", " << reg << "\n";
+            
+            i++;
+            arg_count++;
+          }
+          FN_ARG_COUNT[CB]=arg_count;
+        }
+      }
+    }
+    else if(tk == "def"){
+      while(true){
+        string name = INTER[++i];
+        string size = INTER[++i];
+        string value = INTER[++i];
+        if(size == "4"){
+          BYTE_MAP[CB]+=4;
+          int PTR = BYTE_MAP[CB];
+          PTR_MAPS[CB][name] = PTR;
+          VAR_SIZE_MAPS[CB][name]=size;
+          if(value != ";"){
+            if(literal_or_var(value)=="ID"){
               out_stream <<
-"    mov "<< get_asm_value(var, PTR_MAPS[y], type) <<", dl;"<<var<<"\n";
+              "    mov eax, " << asm_get_value(value, PTR_MAPS[CB]) << "\n"
+              "    mov " << asm_var(PTR, 4) << ", eax\n";
             }
             else{
               out_stream <<
-"    mov eax," << FUNC_ARG_REGISTER_LIST32[(arg_count-1)-i] << "\n"
-"    mov " << get_asm_value(var, PTR_MAPS[y], type) << ", al;"<<var<<"\n";
+              "    mov " << asm_var(PTR, 4) << ", " << asm_get_value(value, PTR_MAPS[CB]) << "\n";
             }
           }
-          else if(type=="PTR"||type=="STRING"){
-            out_stream <<
-"    mov " << get_asm_value(var, PTR_MAPS[y], type) << ", " << FUNC_ARG_REGISTER_LIST64[(arg_count-1)-i]<<";"<<var<<"\n";
-          }
+          else break;
         }
-        FN_ITER_MAX = TREE_CONECTIONS[y].size();
-        for(int i = 0; i < TREE_CONECTIONS[y].size(); i++){
-          int z = TREE_CONECTIONS[y][i];
-          FN_ITER = i;
-          process_node(TREE[z],z);
-        }
-        CURRENT_FN = 0;
-        out_stream <<
-"    pop rbp\n";
-        if(x.DATA[0]=="MAIN"){
-          out_stream <<
-"    mov rax, 60\n"
-"    mov rdi, 0\n"
-"    syscall\n";
-        }
-        else{
-          out_stream << "    ret\n";
-        }
-      }else{
-        cerr << "Um... there is no code in the function."<<x.DATA[0]<<"\n";
-        assert(false);
-      }
-    }
-    
-    void var_node(NODE &x, int y){
-      string name = x.DATA[0];
-      string type = x.DATA[1];
-      string value = x.DATA[2];
-      string type2 = literal_or_var(x.DATA[2]);
-      if(type != "STRING"){
-        if(type2=="ID"){
-          type2 = TYPE_MAPS[CURRENT_FN][value];
-          out_stream << "    mov eax, " << get_asm_value(value,PTR_MAPS[CURRENT_FN],type2) << "\n" <<
-          "    mov " << get_asm_value(name,PTR_MAPS[CURRENT_FN],type) << ", eax\n";
-        }
-        else{
-          out_stream << "    mov " << get_asm_value(name,PTR_MAPS[CURRENT_FN],type) << ", " << get_asm_value(value,PTR_MAPS[CURRENT_FN],type2) << "\n";
-        }
-      }
-      else{
-        x.DATA.push_back(to_string(CURRENT_FN));
-        STRING_DEFS.push_back(x);
-      }
-    }
-    
-    void var_expr_node(NODE &x, int y){
-      string name = x.DATA[0];
-      int z = TREE_CONECTIONS[y][0];
-      string in_reg = process_node(TREE[z],z);
-      string type = x.DATA[1];
-      out_stream << "    mov " << get_asm_value(name,PTR_MAPS[CURRENT_FN],type) << ", " << in_reg <<";"<<name<<"\n";
-    }
-    
-    string code_node(NODE &x, int y){
-      string syntax_name = x.DATA[0];
-      vector<string> tokens;
-      for(int i = 1; i < x.DATA.size();i++){
-        tokens.push_back(x.DATA[i]);
-      }
-      SYNTAX syntax = SYNTAX_MAP[syntax_name];
-      vector<string> code = processs_syntax(syntax, tokens, BLOCK_NODE_INDEX);
-      for(string &s : code){
-        out_stream << s;
-      }
-      return syntax.OUT_REG;
-    }
-    
-    string fn_call_node(NODE &x, int y){
-      //PUSH ARGS TO STACK THEN DO CALL OPERATOR
-      string label = x.DATA[0];
-      if(label == "WRITE"){
-        string type = literal_or_var(x.DATA[1]);
-        if(type=="ID"){
-          type = TYPE_MAPS[CURRENT_FN][x.DATA[1]];
-        }
-        label+="_"+type;
-        if(type == "BOOL" || type == "CHAR"){
-          out_stream <<
-    "    mov al, " << get_asm_value(x.DATA[1], PTR_MAPS[CURRENT_FN], type) << "\n" <<
-    "    call " << label << "\n";
-        }
-        else if(type == "PTR"){
-          out_stream <<
-    "    mov rsi, " << get_asm_value(x.DATA[1], PTR_MAPS[CURRENT_FN], type) << "\n";
-        }
-        else if(type == "STRING"){
-          string ID = get_asm_value(x.DATA[1], PTR_MAPS[CURRENT_FN], type);
-          out_stream <<
-    "    mov rsi, " << ID << "\n"
-    "    mov edx, " << ID << "_LEN\n"
-    "    call " << label << "\n";
-        }
-        else{
-          out_stream <<
-    "    mov " << FUNC_ARG_REGISTER_LIST32[0]<<", " << get_asm_value(x.DATA[1], PTR_MAPS[CURRENT_FN], type) << "\n"
-    "    call " << label << "\n";
-        }
-      }
-      else if(label == "PNL"){
-        out_stream <<"    call WRITE_NEW_LINE\n";
-      }
-      else if(label == "SYSCALL"){
-        for(int i = 1; i < x.DATA.size(); i++){
-          string value = x.DATA[i];
-          string type = literal_or_var(value);
-          bool ID = false;
-          if(type=="ID"){
-            type = TYPE_MAPS[CURRENT_FN][value];
-            ID = true;
-          }
-          if(type=="UINT"&&ID){
-            out_stream <<
-            "    movsx " << SYSCALL_ARGS[i-1] << ", "<< get_asm_value(value, PTR_MAPS[CURRENT_FN], type) << "\n";
-          }
-          else if(type=="PTR"||!ID||type=="STRING"){
-            out_stream <<
-            "    mov " << SYSCALL_ARGS[i-1] << ", "<< get_asm_value(value, PTR_MAPS[CURRENT_FN], type) << "\n";
-          }
-        }
-        out_stream <<
-        "    syscall\n";
-      }
-      else if(label == "GET_PTR"){
-        //GET PTR TO VAR
-        //AND IMPLEMENT VAR_DEC ACCEPTING FUNC_CALLS
-        if(PTR_MAPS[CURRENT_FN][x.DATA[1]]<=0){
-          out_stream <<
-          "    lea rax, [rbp+" << PTR_MAPS[CURRENT_FN][x.DATA[1]] << "]\n";
-        }
-        else{
-          out_stream <<
-          "    mov rax, [__STRING"<<PTR_MAPS[CURRENT_FN][x.DATA[1]]<<"]\n";
-        }
-        return "rax";
-      }
-      else{
-        for(int i = 1; i < x.DATA.size(); i++){
-          string value = x.DATA[i];
-          string type = literal_or_var(value);
-          if(type=="ID"){
-            type = TYPE_MAPS[CURRENT_FN][value];
-          }
-          if(DEBUG_MODE){
-            for(auto t : PTR_MAPS[CURRENT_FN]){
-              cout << "{" << t.first << ", " << t.second << "}\n";
-            }
-          }
-          if(type == "UINT"){
-          out_stream <<
-  "    mov " << FUNC_ARG_REGISTER_LIST32[i-1]<<", " << get_asm_value(value, PTR_MAPS[CURRENT_FN], type) << "\n";
-          }
-          else if(type == "PTR" || type == "STRING"){
-            out_stream <<
-            "    mov " << FUNC_ARG_REGISTER_LIST64[i-1]<<", " << get_asm_value(value, PTR_MAPS[CURRENT_FN], type) << "\n";
-          }
-        }
-        out_stream <<
-  "    call " << label << "\n";
-      }
-      return "NA";
-    }
-    
-    void COMP_JMP(NODE &x, string &value, string &type, string &jump){
-      if(value == "!"){
-        value = x.DATA[1];
-        type = literal_or_var(value);
-        if(type=="ID"){
-          type = TYPE_MAPS[CURRENT_FN][value];
-          out_stream <<
-    "    cmp " << get_asm_value(value, PTR_MAPS[CURRENT_FN], type) <<", 1\n";
-          jump = "je";
-        }
-        else{
-          if(value == "TRUE"){
-            jump = "";
+        else if(size == "8"){
+          int PTR;
+          if(VAR_TYPE[name]!="PTR"){
+            BYTE_MAP[CB]+=8;
+            PTR = BYTE_MAP[CB];
+            PTR_MAPS[CB][name] = PTR;
+            VAR_SIZE_MAPS[CB][name]=size;
           }
           else{
-            jump = "jmp";
+            PTR = PTR_MAPS[CB][name];
           }
+          if(value != ";"){
+            if(literal_or_var(value)=="ID"){
+              out_stream <<
+              "    mov rax, " << asm_get_value(value, PTR_MAPS[CB]) << "\n"
+              "    mov " << asm_var(PTR, stoi(size)) << ", rax\n";
+            }
+            else{
+              out_stream <<
+              "    mov " << asm_var(PTR, stoi(size)) << ", " << asm_get_value(value, PTR_MAPS[CB]) << "\n";
+            }
+          }
+          else break;
         }
-        if(type!="BOOL"){
-          cerr << "PUT NOT GATE (!) IN FRONT A NON-BOOLEAN IN AN IF STATEMENT, INSTEAD WAS PUT INFRONT OF '"
-          << value << "'.\n";
+        else if(size == "1"){
+          BYTE_MAP[CB]+=1;
+          int PTR = BYTE_MAP[CB];
+          PTR_MAPS[CB][name] = PTR;
+          VAR_SIZE_MAPS[CB][name]=size;
+          if(value != ";"){
+            if(literal_or_var(value)=="ID"){
+              out_stream <<
+              "    mov al, " << asm_get_value(value, PTR_MAPS[CB]) << "\n"
+              "    mov " << asm_var(PTR, stoi(size)) << ", al\n";
+            }
+            else{
+              out_stream <<
+              "    mov " << asm_var(PTR, stoi(size)) << ", " << asm_get_value(value, PTR_MAPS[CB]) << "\n";
+            }
+          }
+          else break;
+        }
+        else{
+          cerr << "\033[1;31mUNRECOGNIZED SIZE!\033[0m\n";
+          cerr << "SIZE: " << size << "\n"
+          "VALUE: " << value << "\n";
           assert(false);
         }
+        if(INTER[++i]==",") continue;
+        if(INTER[i]==";") break;
+      }
+    }
+    else if(tk == "end"){
+      if(INTER[i+1]=="loop"){
+        i++;
+        vector<string> con;
+        while(STACK[STACK.size()-1]!=";"){
+          con.push_back(STACK[STACK.size()-1]);
+          STACK.pop_back();
+        }
+        STACK.pop_back();
+        con.push_back(";");
+        out_stream <<
+        ".loop" << BLOCK_STACK[BLOCK_STACK.size()-1] << "_in:\n";
+        ss << "loop" << BLOCK_STACK[BLOCK_STACK.size()-1] << "_out";
+        string label = ss.str();
+        ss.str("");
+        COMPILE_CONDITIONAL_JUMP(label, con, out_stream, PTR_MAPS[CB]);
+        BLOCK_STACK.pop_back();
+        i++;
+      }
+      else if(INTER[i+1] == "if"){
+        i++;
+        out_stream << STACK[STACK.size()-1];
+        STACK.pop_back();
+        STACK.pop_back();
+        BLOCK_STACK.pop_back();
+        i++;
+      }
+      else if(INTER[i+1] == "else"){
+        i++;
+        out_stream << STACK[STACK.size()-1];
+        STACK.pop_back();
+        STACK.pop_back();
+        BLOCK_STACK.pop_back();
+        i++;
+      }
+      else if(INTER[i+1] == "elif"){
+        i++;
+        out_stream << STACK[STACK.size()-1];
+        STACK.pop_back();
+        STACK.pop_back();
+        BLOCK_STACK.pop_back();
+        out_stream << STACK[STACK.size()-1];
+        STACK.pop_back();
+        STACK.pop_back();
+        BLOCK_STACK.pop_back();
+        i++;
       }
       else{
-        type = literal_or_var(value);
-        if(type=="ID"){
-          type = TYPE_MAPS[CURRENT_FN][value];
-        }
-        if(type=="UINT"){
+        if(CB=="_start"){
           out_stream <<
-    "    mov eax, " << get_asm_value(value, PTR_MAPS[CURRENT_FN], type) << "\n" <<
-    "    cmp eax, " << get_asm_value(x.DATA[2], PTR_MAPS[CURRENT_FN], type) << "\n";
-          string comparator = x.DATA[1];
-          if(comparator == "LESS") jump = "jge";
-          else if(comparator == "GREATER") jump = "jle";
-          else if(comparator == "EQL") jump = "jne";
-          else if(comparator == "NEQL") jump = "je";
-          else if(comparator == "LESS_EQL") jump = "jg";
-          else if(comparator == "GREATER_EQL") jump = "jl";
+  "    pop rbp\n"
+  "    mov rax, 60\n"
+  "    mov rdi, 0\n"
+  "    syscall\n";
         }
-        else if(type=="BOOL"){
-          if(value=="TRUE"){
-            jump = "";
-          }
-          else if(value=="FALSE"){
-            jump = "jmp";
-          }
-          else{
+        else if(RET_FNS.find(CB)==RET_FNS.end()){
           out_stream <<
-    "    cmp " << get_asm_value(value, PTR_MAPS[CURRENT_FN], type) <<", 0\n";
-            jump = "je";
-          }
+          "    pop rbp\n"
+          "    ret\n";
         }
+        i++;
       }
     }
-    
-    void if_node(NODE &x, int y){
-      ESC_L=0;
-      L_COUNTER++;
-      ss << ".L" << L_COUNTER;
-      string label = ss.str();
-      ss.str("");
-      string value = x.DATA[0];
-      string jump;
-      string type;
-      COMP_JMP(x, value, type, jump);
-      if(jump!=""){
-        out_stream <<
-  "    " << jump << " " << label <<"\n";
+    else if(tk == "in" || tk == "insx"){
+      string next_command = tk;
+      int arg_count = 0;
+      while(next_command=="in" || next_command=="insx"){
+        string size = INTER[++i];
+        string value = INTER[++i];
+        string reg;
+        if(INTER[i+1]!="to"){
+          if(size == "4")reg = FUNC_ARG_REGISTER_LIST32[arg_count];
+          else if(size == "8" || size == "0")reg = FUNC_ARG_REGISTER_LIST64[arg_count];
+          else if(size == "1")reg = FUNC_ARG_REGISTER_LIST8[arg_count];
+        }
+        else{
+          i++;
+          reg = INTER[++i];
+        }
+        if(size == "0"){
+          out_stream <<
+          "    mov " << reg << ", [" <<value<<"]\n";
+        }
+        else if(next_command == "in"){
+          out_stream <<
+          "    mov " << reg <<", "<<asm_get_value(value, PTR_MAPS[CB]) << "\n";
+        }
+        else if(next_command == "insx"){
+          out_stream <<
+          "    movsx " << reg <<", "<<asm_get_value(value, PTR_MAPS[CB]) << "\n";
+        }
+        i++;
+        next_command = INTER[++i];
+        arg_count++;
       }
-      for(int z: TREE_CONECTIONS[y]) process_node(TREE[z],z);
-      if(FN_ITER_MAX - FN_ITER != 1){
-        int NEXT_BLOCK = TREE_CONECTIONS[CURRENT_FN][FN_ITER+1];
-        if(TREE[NEXT_BLOCK].TYPE=="ELSE")else_node(TREE[NEXT_BLOCK], NEXT_BLOCK);
-        else if(TREE[NEXT_BLOCK].TYPE=="ELIF")elif_node(TREE[NEXT_BLOCK], NEXT_BLOCK);
+      if(next_command == "call"){
+        i--;
       }
-      else if(jump!="")out_stream << label << ":\n";
-    }
-    
-    void else_node(NODE &x, int y){
-      L_COUNTER++;
-      if(ESC_L==0){
-        out_stream << "    jmp .L" << L_COUNTER << "\n"
-        ".L" << L_COUNTER - 1 << ":\n";
-        for(int z: TREE_CONECTIONS[y]) process_node(TREE[z],z);
-        out_stream << ".L" << L_COUNTER << ":\n";
+      else if(next_command == "syscall"){
+        out_stream << "    syscall\n";
+        i++;
       }
       else{
-        out_stream << "    jmp .L" << ESC_L << "\n"
-        ".L" << L_COUNTER - 1 << ":\n";
-        for(int z: TREE_CONECTIONS[y]) process_node(TREE[z],z);
-        out_stream << ".L" << ESC_L << ":\n";
-      }
-    }
-    
-    void loop_node(NODE &x, int y){
-      L_COUNTER+=2;
-      out_stream <<
-"    jmp .L" << L_COUNTER - 1 << "\n"
-".L" << L_COUNTER << ":\n";
-      string value = x.DATA[0];
-      string jump;
-      string type;
-      int RES = L_COUNTER;
-      for(int z: TREE_CONECTIONS[y]) process_node(TREE[z],z);
-      out_stream << ".L" << RES - 1 << ":\n";
-      COMP_JMP(x, value, type, jump);
-      jump = INV_JUMP[jump];
-      if(jump!=""){
-        out_stream <<
-  "    " << jump << " .L" << RES << "\n";
-      }
-      if(x.TYPE!="LOOP"){
-        out_stream <<
-    ".L" << x.TYPE << ":\n";
-      }
-    }
-    
-    void elif_node(NODE &x, int y){
-      L_COUNTER++;
-      string value = x.DATA[0];
-      string jump;
-      string type;
-      int NEXT_BLOCK=-1;
-      NODE w;
-      if(FN_ITER_MAX - FN_ITER != 1){
-        NEXT_BLOCK = TREE_CONECTIONS[CURRENT_FN][++FN_ITER];
-        w = TREE[NEXT_BLOCK];
-      }
-      if(ESC_L==0)ESC_L = L_COUNTER;
-      out_stream <<
-  "    jmp .L" << ESC_L <<"\n";
-      out_stream << ".L" << L_COUNTER - 1 << ":\n";
-      COMP_JMP(x, value, type, jump);
-      if(jump != ""){
-        if(ESC_L==L_COUNTER) out_stream << "    " << jump << " .L" << L_COUNTER+1 << "\n";
-        else if(w.TYPE!="ELIF" && w.TYPE!="ELSE") out_stream << "    " << jump << " .L" << ESC_L << "\n";
-        else out_stream << "    " << jump << " .L" << L_COUNTER << "\n";
-      }
-      if(ESC_L == L_COUNTER)L_COUNTER++;
-      for(int z: TREE_CONECTIONS[y]) process_node(TREE[z],z);
-      if(NEXT_BLOCK != -1){
-        if(w.TYPE=="ELSE")else_node(w, NEXT_BLOCK);
-        else if(w.TYPE=="ELIF")elif_node(w, NEXT_BLOCK);
-        else out_stream << ".L" << ESC_L << ":\n";
-      }
-      else out_stream << ".L" << ESC_L << ":\n";
-    }
-    
-    void break_node(NODE &x, int y){
-      int loop = stoi(x.DATA[0]);
-      if(TREE[loop].TYPE!="LOOP"){
-        string esc_L = TREE[loop].TYPE;
-        out_stream << "    jmp .L" << esc_L << "\n";
-      }
-      else{
-        TREE[loop].TYPE=to_string(++L_COUNTER);
-        out_stream << "    jmp .L" << L_COUNTER << "\n";
-      }
-    }
-    
-    string process_node(NODE &x, int y){
-      if(x.TYPE=="FUNC"){
-        func_node(x,y);
-      }
-      else if(x.TYPE=="VAR_DEC"){
-        var_node(x,y);
-      }
-      else if(x.TYPE=="VAR_EXPR"){
-        var_expr_node(x,y);
-      }
-      else if(x.TYPE=="IF"){
-        if_node(x,y);
-      }
-      else if(x.TYPE=="CODE"){
-        return code_node(x,y);
-      }
-      else if(x.TYPE=="FN_CALL"){
-        return fn_call_node(x,y);
-      }
-      else if(x.TYPE=="LOOP"){
-        loop_node(x,y);
-      }
-      else if(x.TYPE=="BREAK"){
-        break_node(x,y);
-      }
-      return "NA";
-    }
-    
-    void parse_tree(){
-      if(TREE_CONECTIONS[0].size()>0){
-        for(int y: TREE_CONECTIONS[0]){
-          process_node(TREE[y],y);
-        }
-      }else{
-        cerr << "Did you not even write a program...?\nLAZY ASS!!!\n";
+        cerr << next_command << "\n";
+        cerr << "\033[1;31mUNREACHABLE!\033[0m\n";
         assert(false);
       }
     }
-    
-    void _exit(){
-      out_stream <<
-      "\n\nSECTION .data\n";
-      for(NODE &x : STRING_DEFS){
-        int ID = PTR_MAPS[stoi(x.DATA[x.DATA.size()-1])][x.DATA[0]];
+    else if(tk == "call"){
+      out_stream << "    call " << INTER[++i] << "\n";
+      if(FNV!=""){
+        int PTR = PTR_MAPS[CB][FNV];
         out_stream <<
-        "__STRING" << ID << " db " << x.DATA[2] << "\n"
-        "__STRING"<< ID << "_LEN equ $ - __STRING" << ID << "\n";
+        "    mov " << asm_var(PTR, stoi(VAR_SIZE_MAPS[CB][FNV])) << ", " << RET_REG[INTER[i]] << "\n";
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "ret"){
+      out_stream <<
+      "    pop rbp\n"
+      "    ret\n";
+      i++;
+    }
+    else if(tk == "out"){
+      string value = INTER[++i];
+      if(INTER[++i]!="to"){
+        cerr << "\033[1;31mUNREACHABLE\033[0m\n";
+        assert(false);
+      }
+      string reg = INTER[++i];
+      out_stream <<
+      "    xor rax, rax\n"
+      "    mov " << reg << ", " << asm_get_value(value, PTR_MAPS[CB]) << "\n";
+      i++;
+    }
+    else if(tk == "regmov"){
+      string value = INTER[++i];
+      if(INTER[++i]!="to"){
+        cerr << "\033[1;31mUNREACHABLE\033[0m\n";
+        assert(false);
+      }
+      string reg = INTER[++i];
+      out_stream <<
+      "    mov " << asm_get_value(value, PTR_MAPS[CB]) << ", " << reg << "\n";
+      i++;
+    }
+    else if(tk == "asm"){
+      if(INTER[++i]!="out"){
+        cerr << "\033[1;31mOUT REQUIRED IN ASM MACRO\033[0m\n";
+        assert(false);
+      }
+      string out_reg = INTER[++i];
+      string ASM = INTER[++i];
+      while(ASM != ";"){
+        if(ASM=="@"){
+          out_stream << asm_get_value(INTER[++i], PTR_MAPS[CB]);
+        }
+        else{
+          out_stream << ASM;
+        }
+        ASM = INTER[++i];
+      }
+      if(FNV!=""){
+        int PTR = PTR_MAPS[CB][FNV];
+        out_stream <<
+        "    mov " << asm_var(PTR, stoi(VAR_SIZE_MAPS[CB][FNV])) << ", "<< out_reg <<"\n";
+        FNV="";
       }
     }
-    
-};
+    else if(tk == "alloc"){
+      int bytes = stoi(INTER[++i]);
+      BYTE_MAP[CB] += bytes;
+      int PTR = BYTE_MAP[CB];
+      if(FNV!=""){
+        out_stream <<
+        "    lea rax, [rbp-" << PTR << "]\n"
+        "    mov " << asm_var(PTR_MAPS[CB][FNV], 8) << ", rax\n";
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "dealloc"){
+      BYTE_MAP[CB] -= stoi(INTER[++i]);
+    }
+    else if(tk == "addr_sub"){
+      string addr_var = INTER[++i];
+      string additive = INTER[++i];
+      if(FNV!=""){
+        int PTR = PTR_MAPS[CB][FNV];
+        out_stream <<
+        "    mov rax, " << asm_get_value(addr_var, PTR_MAPS[CB]) << "\n";
+        if(literal_or_var(additive)=="ID"){
+          out_stream <<
+          "    movsx rdx, " << asm_get_value(additive, PTR_MAPS[CB]) << "\n"
+          "    sub rax, rdx\n";
+        }
+        else{
+          out_stream <<
+          "    sub rax, " << additive << "\n";
+        }
+        out_stream <<
+        "    mov " << asm_var(PTR, 8) << ", rax\n";
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "addr_add"){
+      string addr_var = INTER[++i];
+      string additive = INTER[++i];
+      if(FNV!=""){
+        int PTR = PTR_MAPS[CB][FNV];
+        out_stream <<
+        "    mov rax, " << asm_get_value(addr_var, PTR_MAPS[CB]) << "\n";
+        if(literal_or_var(additive)=="ID"){
+          out_stream <<
+          "    movsx rdx, " << asm_get_value(additive, PTR_MAPS[CB]) << "\n"
+          "    add rax, rdx\n";
+        }
+        else{
+          out_stream <<
+          "    add rax, " << additive << "\n";
+        }
+        out_stream <<
+        "    mov " << asm_var(PTR, 8) << ", rax\n";
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "addr_get"){
+      int bytes = stoi(INTER[++i]);
+      string ptr = INTER[++i];
+      if(FNV!=""){
+        string reg;
+        string word = WORD_TABLE[bytes][0];
+        if(bytes == 8) reg = "rax";
+        else if(bytes == 4) reg = "eax";
+        else if(bytes == 1) reg = "al";
+        int PTR = PTR_MAPS[CB][FNV];
+        out_stream <<
+        "    mov rax, " << asm_get_value(ptr, PTR_MAPS[CB]) << "\n"
+        "    mov " << reg << ", "<< WORD_TABLE[bytes][0] <<" [rax]\n"
+        "    mov " << asm_var(PTR, bytes) << ", "<< reg <<"\n";
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "addr_equ"){
+      int bytes = stoi(INTER[++i]);
+      string ptr = INTER[++i];
+      string value = INTER[++i];
+      string reg;
+      string word = WORD_TABLE[bytes][0];
+      if(bytes == 8) reg = "rax";
+      else if(bytes == 4) reg = "eax";
+      else if(bytes == 1) reg = "al";
+      out_stream <<
+      "    mov rbx, " << asm_get_value(ptr, PTR_MAPS[CB]) << "\n";
+      if(literal_or_var(value)=="ID"){
+        out_stream <<
+        "    mov " << reg << ", " << asm_get_value(value, PTR_MAPS[CB]) << "\n"
+        "    mov " << word <<" [rbx], "<< reg <<"\n";
+      }
+      else{
+        out_stream <<
+        "    mov " << word <<" [rbx], "<< asm_get_value(value, PTR_MAPS[CB]) <<"\n";
+      }
+      i++;
+    }
+    else if(tk == "sleep"){
+      string seconds = INTER[++i];
+      string nanoseconds = INTER[++i];
+      out_stream <<
+      "    mov dword [tv_sec], "<< asm_get_value(seconds, PTR_MAPS[CB]) <<"\n"
+      "    mov dword [tv_usec], "<< asm_get_value(nanoseconds, PTR_MAPS[CB]) <<"\n"
+      "    mov rax, 0x23\n" //NR for nanosleep
+      "    mov edi, timeval\n"
+      "    mov esi, 0\n"
+      "    syscall\n";
+      i++;
+    }
+    else if(tk == "cast"){
+      string type_to = INTER[++i];
+      string var = INTER[++i];
+      string type_of = VAR_TYPE[var];
+      if(FNV!=""){
+        int PTR = PTR_MAPS[CB][FNV];
+        if(type_of == "BOOL"){
+          if(type_to == "UINT"){
+            out_stream <<
+            "    xor eax, eax\n"
+            "    movsx eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    mov " << asm_var(PTR, 4) << ", eax\n";
+          }
+          else if(type_to == "CHAR"){
+            out_stream <<
+            "    movsx eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    add eax, 48 \n"
+            "    mov " << asm_var(PTR, 1) << ", al\n";
+          }
+          else{
+            cerr << "\033[1;31mCASTING A '" << type_of << "'" << " TO A '" << type_to << "' IS NOT SUPPORTED!\033[0m\n";
+            assert(false);
+          }
+        }
+        else if(type_of == "CHAR"){
+          if(type_to == "BOOL"){
+            out_stream <<
+            "    movsx eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    sub eax, 48 \n"
+            "    mov " << asm_var(PTR, 1) << ", al\n";
+          }
+          else if(type_to == "UINT"){
+            out_stream <<
+            "    movsx eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    sub eax, 48 \n"
+            "    mov " << asm_var(PTR, 4) << ", eax\n";
+          }
+          else{
+            cerr << "\033[1;31mCASTING A '" << type_of << "'" << " TO A '" << type_to << "' IS NOT SUPPORTED!\033[0m\n";
+            assert(false);
+          }
+        }
+        else if(type_of == "UINT"){
+          if(type_to == "BOOL"){
+            out_stream <<
+            "    mov eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    mov " << asm_var(PTR, 1) << ", al\n";
+          }
+          else if(type_to == "CHAR"){
+            out_stream <<
+            "    mov eax, " << asm_get_value(var, PTR_MAPS[CB]) << "\n"
+            "    mov " << asm_var(PTR, 1) << ", al\n";
+          }
+          else{
+            cerr << "\033[1;31mCASTING A '" << type_of << "'" << " TO A '" << type_to << "' IS NOT SUPPORTED!\033[0m\n";
+            assert(false);
+          }
+        }
+        else{
+          cerr << "\033[1;31mCASTING A '" << type_of << "'" << " TO A '" << type_to << "' IS NOT SUPPORTED!\033[0m\n";
+          assert(false);
+        }
+        FNV="";
+      }
+      i++;
+    }
+    else if(tk == "open_fd"){
+      string filename = INTER[++i];
+      string flags = INTER[++i];
+      string mode = INTER[++i];
+      if(FNV!=""){
+        out_stream <<
+        "    mov rax, 2\n" // SYS_OPEN
+        "    mov rdi, " << filename << "\n"
+        "    mov esi, " << asm_get_value(flags, PTR_MAPS[CB]) << "\n"
+        "    mov edx, " << asm_get_value(mode, PTR_MAPS[CB]) << "\n"
+        "    syscall\n"
+        "    mov " << asm_get_value(FNV, PTR_MAPS[CB]) << ", eax\n";
+        i++;
+        FNV="";
+      }
+    }
+    else if(tk == "SECTION"){
+      if(INTER[++i] == ".DATA"){
+        out_stream << "SECTION .data\n"
+        "@TRUE: db 'true'\n"
+        "@TRUELEN   equ  $-@TRUE\n"
+        "@FALSE: db 'false'\n"
+        "@FALSELEN   equ  $-@FALSE\n"
+        "timeval:\n"
+        "   tv_sec  dd 0\n"
+        "   tv_usec dd 0\n";
+        i++;
+        while(INTER[++i]!="/ESC/"){
+          out_stream << INTER[i];
+        }
+      }
+      else if(INTER[i] == ".BSS"){
+        out_stream << "SECTION .bss\n";
+        i++;
+        while(INTER[++i]!="/ESC/"){
+          out_stream << INTER[i];
+        }
+      }
+    }
+    else if(PTR_MAPS[CB].find(tk) != PTR_MAPS[CB].end()){
+      if(INTER[++i]=="="){
+        string type = literal_or_var(INTER[++i]);
+        if(type == "ID" && OPS.find(INTER[i]) != OPS.end()){
+          string in_reg = COMPILE_OP(i, INTER[i], INTER, out_stream, PTR_MAPS[CB]);
+          int PTR = PTR_MAPS[CB][tk];
+          out_stream <<
+          "    mov " << asm_var(PTR, stoi(VAR_SIZE_MAPS[CB][tk])) << ", " << in_reg << "\n";
+        }
+        else{
+          if(type == "ID"){
+            type = VAR_TYPE[tk];
+            int size = TYPE_BITS[type];
+            int PTR = PTR_MAPS[CB][tk];
+            string reg;
+            if(size == 8) reg = "rax";
+            else if(size == 4) reg = "eax";
+            else if(size == 1) reg = "al";
+            out_stream <<
+            "    mov " << reg << ", " << asm_var(PTR_MAPS[CB][INTER[i]], stoi(VAR_SIZE_MAPS[CB][INTER[i]])) << "\n"
+            "    mov " << asm_var(PTR, stoi(VAR_SIZE_MAPS[CB][tk])) << ", " << reg << "\n";
+            i++;
+          }
+          else{
+            int PTR = PTR_MAPS[CB][tk];
+            out_stream <<
+            "    mov " << asm_var(PTR, stoi(VAR_SIZE_MAPS[CB][tk])) << ", " << asm_get_value(INTER[i], PTR_MAPS[CB]) << "\n";
+            i++;
+          }
+        }
+      }
+      else if(INTER[i]=="<--"){
+        FNV = tk;
+        i++;
+      }
+    }
+    else if(OPS.find(tk) != OPS.end()){
+      COMPILE_OP(i, tk, INTER, out_stream, PTR_MAPS[CB]);
+    }
+    else{
+      cerr << "\033[1;31mUNSUPPORTED COMMAND\033[0m\n" <<
+      tk <<"\n"
+      << INTER[i-1] << "\n"
+      << INTER[i-2] << "\n"
+      << INTER[i-3] << "\n";
+      assert(false);
+    }
+  }
+}
 
 int main(int argc, char** argv){
   assert(argc > 0);
@@ -2036,91 +2762,107 @@ int main(int argc, char** argv){
   
   //COMPILATION OF ADPL
   INIT_TABLE();
-  if(DEBUG_MODE){
-    cout << "\nTOKEN TABLE:\n";
-    for(auto const &pair: tk_table){
-      cout << "{" <<pair.first<<":"<<pair.second<<"}\n";
-    }
-  }
   
-  stop_timer("START_TIME");
+  stop_timer("START");
   start_timer();
   
+  //LEXING
   if(DEBUG_MODE) cout << "\nTOKEN STREAM:\n";
-  vector<string> token_stream = LEXER(adpl_file.c_str());
+  LEXER(adpl_file.c_str());
   if(DEBUG_MODE){
-    for(string tk : token_stream){
-      cout<<tk<<" ";
-      if(tk=="NL"){
+    for(pair<string, string> &tk : TK_STREAM){
+      cout<<"("<<tk.first<<","<<tk.second<<"), ";
+      if(tk.first=="NL"){
         cout<<"\n";
       }
     }
+    cout << "\n";
   }
-  start_timer();
+  stop_timer("LEXER");
   
-  INIT_SYNTAXES();
-  
-  stop_timer("INIT_SYNTAXES");
+  //CHECK SYNTAX ERRORS ECT.
   start_timer();
-  //if(DEBUG_MODE) cout << "\nPARSE TREE STATE DEBUG:\n";
-  PARSER parser(token_stream);
-  parser.run();
+  CHECK_GRAMMER();
   if(DEBUG_MODE){
-    cout << "\nPARSE TREE:\n";
-    int i = 0;
-    while(true){
-      if(i >= NODE_INDEX)break;
-      if(TREE[i].TYPE=="PROGRAM"){
-        print(TREE[i],i);
+    cout << "\nEDITTED TKS:\n";
+    for(pair<string, string> &tk : TK_STREAM){
+      cout<<"("<<tk.first<<","<<tk.second<<"), ";
+      if(tk.first=="NL"){
+        cout<<"\n";
       }
-      i++;
     }
-    cout << "\nPARSE TREE CONNECTIONS:\n";
-    i = 0;
-    while(true){
-      if(i >= NODE_INDEX)break;
-      for (int x : TREE_CONECTIONS[i]){
-        cout << x <<" ";
-      }
-      if(TREE_CONECTIONS[i].size()==0){
-        cout << "-";
-      }
-      cout << "    " << TREE[i].TYPE << "\n";
-      i++;
-    }
-    
-    cout << "\nINVERSE PARSE TREE CONNECTIONS:\n";
-    i = 0;
-    while(true){
-      if(i >= NODE_INDEX)break;
-      cout << INV_TREE_CONNECTIONS[i];
-      cout << "    " << TREE[i].TYPE << "\n";
-      i++;
-    }
+    cout << "\n";
   }
-  stop_timer("PARSE");
+  stop_timer("GRAMMER CHECK");
   
+  //TYPE CHECK
+  start_timer();
   INIT_FUNC_ARG_REGISTER_LIST();
+  vector<string> INTER_CODE = INTERMEDIATE();
+  if(DEBUG_MODE){
+    for(string &tk : INTER_CODE){
+      cout<<tk<<" ";
+      if(tk==";"){
+        cout<<"\n";
+      }
+    }
+    cout << "\n";
+  }
+  PRESCAN(INTER_CODE);
+  stop_timer("INTERMEDIATE CODE GEN");
   
   start_timer();
-  COMPILER compiler(asm_file);
-  compiler.run();
-  stop_timer("COMPILER");
+  COMPILE(asm_file, INTER_CODE);
+  stop_timer("COMPILATION");
   
   start_timer();
-  
+
   //COMPILATION OF ASM CODE
-  ss << "nasm -f elf64 -o "<< basename << ".o " << asm_file;
+  ss << "nasm -felf64 -o "<< basename << ".o " << asm_file;
   string cmd_line = ss.str();
   const char* char_line = cmd_line.c_str();
   ss.str("");
   system(char_line);
   
-  //ss << "ld " << basename << ".o";
-  ss << "ld -o " << basename << " " << basename << ".o";
+  vector<string> LINK_BASENAMES;
+  
+  for(int i = 0; i < LINKED_FILES.size(); i++){
+    cout << LINKED_FILES[i] << "\n";
+    //BROKE AS HELL, DW AB IT
+    // if(LINKED_FILES[i].find(".adpl")){
+    //   //ADD -nr FLAG (DOESN'T RUN PROG)
+    //   //ADD -nc DOESN'T COMPILE NASM
+    //   //REVAMP FLAG SYSTEM
+    //   //CAN ONLY LINK ASM FOR NOW
+    //   //DESIRED RESULT:
+    //   //  ;;include 'stdlib.adpl'
+    //   // cerr << "\033[1;31m[TODO!]CAN'T LINK ADPL FOR NOW!\033[0m\n";
+    //   // assert(false);
+    // }
+    // else{
+      string raw = LINKED_FILES[i];
+      string linking_basename = "";
+      for(int j = 0; j < raw.size()-4; j++){
+        linking_basename += raw[j];
+      }
+      ss << "nasm -felf64 -o "<< linking_basename << ".o " << raw;
+      string cmd_line = ss.str();
+      const char* char_line = cmd_line.c_str();
+      ss.str("");
+      system(char_line);
+      if(DEBUG_MODE)cerr << char_line << "\n";
+      LINK_BASENAMES.push_back(linking_basename);
+    // }
+  }
+    
+  ss << "ld -z muldefs -o " << basename << " " << basename << ".o ";
+  for(string &s : LINK_BASENAMES){
+    ss << s << ".o ";
+  }
   cmd_line = ss.str();
   char_line = cmd_line.c_str();
   ss.str("");
+  cerr << cmd_line << "\n";
   system(char_line);
   
   stop_timer("\nCOMPILATION OF ASM");
@@ -2149,6 +2891,16 @@ int main(int argc, char** argv){
   ss.str("");
   system(char_line);
   if(DEBUG_MODE) cout << "DONE!\n";
+  
+  for(string &s : LINK_BASENAMES){
+    if(DEBUG_MODE) cout << "DELETING "<< s << ".o...\n";
+    ss << "shred -u " << s << ".o";
+    cmd_line = ss.str();
+    char_line = cmd_line.c_str();
+    ss.str("");
+    system(char_line);
+    if(DEBUG_MODE) cout << "DONE!\n";
+  }
   
   //DELETES .ASM FILE
   if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
