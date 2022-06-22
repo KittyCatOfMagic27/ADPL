@@ -1,0 +1,114 @@
+fn process_cell(BOOL a BOOL b BOOL c ) BOOL
+  let __output true
+  let w cast(UINT a)
+  let y cast(UINT b)
+  let z cast(UINT c)
+  let sum w + y
+  sum sum + z
+  if(sum == 3)
+    __output false
+  end
+  sum y + z
+  if(sum == 0)
+    __output false
+  end
+  ret __output
+end
+
+
+fn main()
+  #INIT TAPE
+  const[340] tape # The reason we allocate double the length is because the second half is for printing
+  const pattern '001'
+  let pattern.ptr ptr(pattern)
+  let tape.len 170
+  let tape.ptr ptr(tape)
+  let cur.ptr tape.ptr
+  let index 0
+  
+  #FILL TAPE
+  loop(index < tape.len)
+    let x index + tape.len
+    let modulo index + 0
+    loop(modulo >= pattern.len)
+      modulo modulo - pattern.len
+    end
+    cur.ptr pattern.ptr + modulo
+    let value @CHAR cur.ptr
+    let TR cast(BOOL value)
+    if(TR)
+      cur.ptr tape.ptr + index
+      @BOOL cur.ptr true
+      cur.ptr tape.ptr + x
+      @CHAR cur.ptr '@'
+    else
+      cur.ptr tape.ptr + index
+      @BOOL cur.ptr false
+      cur.ptr tape.ptr + x
+      @CHAR cur.ptr ' '
+    end
+    index++
+  end
+  
+  cur.ptr tape.ptr + tape.len
+  write(cur.ptr tape.len)
+  new_line()
+  
+  const[170] buffer
+  let buffer.ptr ptr(buffer)
+
+  # PROG START
+  let iterator 0
+  loop(iterator < 400)
+    #EVAL
+    index 0
+    loop(index < tape.len)
+      let left false
+      let right false
+      cur.ptr tape.ptr + index
+      let middle @BOOL cur.ptr
+      let cursor 0
+      if(index > 0)
+        cursor index - 1
+        cur.ptr tape.ptr + cursor
+        left @BOOL cur.ptr
+      end
+      if(index < tape.len)
+        cursor index + 1
+        cur.ptr tape.ptr + cursor
+        right @BOOL cur.ptr
+      end
+      let output process_cell(left middle right)
+      
+      let write_index index + tape.len
+      if(output)
+        cur.ptr buffer.ptr + index
+        @BOOL cur.ptr true
+        cur.ptr tape.ptr + write_index
+        @CHAR cur.ptr '@'
+      else
+        cur.ptr buffer.ptr + index
+        @BOOL cur.ptr false
+        cur.ptr tape.ptr + write_index
+        @CHAR cur.ptr ' '
+      end
+      index++
+    end
+    
+    #Write from buffer to tape
+    index 0
+    loop(index < tape.len)
+      cur.ptr buffer.ptr + index
+      middle @BOOL cur.ptr
+      cur.ptr tape.ptr + index
+      @BOOL cur.ptr middle
+      index++
+    end
+    
+    #Write
+    cur.ptr tape.ptr + tape.len
+    write(cur.ptr tape.len)
+    new_line()
+    iterator++
+  end
+end
