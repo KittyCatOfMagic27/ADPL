@@ -254,7 +254,7 @@ fn main()
     # save value
     let c a + b
     pos index * bytes_per
-    current @pointer + pos
+    current pointer + pos
     @UINT current c
     
     index++
