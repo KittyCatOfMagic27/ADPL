@@ -11,7 +11,7 @@ unsafe fn WRITE_CHAR()
 end
 
 unsafe fn WRITE_BOOL()
-  asm('    test al, al\n    mov rdi, rsi\n    jz .false\n    lea rsi, [@TRUE]\n    mov edx, @TRUELEN\n    jmp .write\n.false:\n    lea rsi, [@FALSE]\n    mov edx, @FALSELEN\n.write:\n    mov eax, 1\n     syscall\n    ret\n')
+  asm('    test al, al\n    mov rdi, rsi\n    jz .false\n    lea rsi, [$TRUE]\n    mov edx, $TRUELEN\n    jmp .write\n.false:\n    lea rsi, [$FALSE]\n    mov edx, $FALSELEN\n.write:\n    mov eax, 1\n     syscall\n    ret\n')
 end
 
 unsafe fn WRITE_UINT()
