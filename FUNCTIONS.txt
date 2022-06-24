@@ -21,7 +21,7 @@ fn main()
   let stdout 1   # write to term
   let size 1     # size of string
   let string 'H' # string to print
-  let string_ptr(ptr(string)) # get ptr
+  let string_ptr ptr(string) # get ptr
   
   syscall(NR stdout string_ptr size) # call
 end
@@ -39,9 +39,7 @@ itself for another OS. This is because system
 call IDs and parameters differ between OS's.
 
 Linux Syscalls can be found here:
-  - https://chromium.googlesource.com/
-    chromiumos/docs/+/HEAD/constants/
-    syscalls.md
+  - https://chromium.googlesource.com/chromiumos/docs/+/HEAD/constants/syscalls.md
 
 _______VER 0.0.8_______
 
@@ -69,6 +67,7 @@ open_fd(STRING filename UINT flags UINT mode) UINT fd
 close_fd(UINT fd)                             NONE
 read(UINT fd PTR buffer UINT len)             NONE
 fstats(UINT fd PTR buffer144)                 NONE
+asm(STRING LITERAL asm_code)                  NONE
 
 
 EXPIREMENTAL, DEPRECATED, OR BUGGY:
@@ -84,3 +83,10 @@ CHAR --> BOOL to get number from digit
 CHAR --> UINT to get number from digit
 UINT --> CHAR to get any ascii value
 UINT --> BOOL to get 1 byte number
+
+ASM FUNTION SYNATX:
+All the assembly is NASM. You can access a variable by doing 
+@variable_name. Escape sequences DO work with this function 
+and you need to put \n at the end of every line. 
+WARNING THE COMPILER DOESN'T REVIEW THIS CODE AT ALL.
+USE AT YOUR OWN RISK.

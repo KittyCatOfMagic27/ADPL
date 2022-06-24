@@ -48,6 +48,7 @@ vector<string> CONDITIONALS;
 vector<string> NATIVE_FNS;
 vector<string> GLOBAL_FNS;
 vector<string> EXTERN_FNS;
+vector<string> UNSAFE_FNS;
 vector<string> FN_LIST;
 vector<string> BSS;
 vector<int> ELSES;
@@ -56,6 +57,7 @@ string FILE_BASENAME;
 string EXEC_FILE;
 bool DEBUG_MODE = false;
 bool RUN = false;
+bool ASMKEEP = false;
 
 stringstream ss;
 string WHITESPACE = " \n\r\t\f\v";
@@ -167,6 +169,7 @@ void INIT_TABLE(){
   NATIVE_FNS.push_back("close_fd"); // FD(UINT)
   NATIVE_FNS.push_back("read"); // FD(UINT) PTR(BUFFER) UINT(LEN)
   NATIVE_FNS.push_back("fstats"); // FD(UINT) PTR(BUFFER[144])
+  NATIVE_FNS.push_back("asm"); // STRING LITERAL
   
   // SYMBOL              OUT     IN      IN    ...
   OPS["++"].push_back({"UINT", "UINT"});
@@ -293,6 +296,28 @@ string ltrim(const string &s){
 
 string trim(string &s){
   return rtrim(ltrim(s));
+}
+
+string parse(const string& s){
+  for(size_t i = 0; i < s.length(); i++){
+    if(s.at(i) == '\\'){
+      switch(s.at(i + 1)){
+        case 'n':  ss << "\n"; i++; break;
+        case '"':  ss << "\""; i++; break;
+        case 'r':  ss << "\r"; i++; break;
+        case 't':  ss << "\t"; i++; break;
+        case 'f':  ss << "\f"; i++; break;
+        case 'v':  ss << "\v"; i++; break;
+        default:   ss << "\\";      break;
+      }
+    }
+    else{
+      ss << s.at(i);
+    }
+  }
+  string parsed = ss.str();
+  ss.str("");
+  return parsed;
 }
 
 string convertToString(char* &a, int size){
@@ -522,6 +547,7 @@ void process_line(string &line){
     }
     else if(op==";;"){
       if(ops[++i]=="include"){
+        string include_type = ops[++i];
         string fd = ops[++i];
         if(fd[0]!='\''){
           cerr << "\033[1;31mPUT THE FILE DIRECTORY AS A STRING.\033[0m\n";
@@ -531,7 +557,61 @@ void process_line(string &line){
         for(int j = 1; j < fd.size()-1; j++){
           trimmed += fd[j];
         }
-        LINKED_FILES.push_back(trimmed);
+        fd = trimmed;
+        if(include_type=="dynamic"){
+          LINKED_FILES.push_back(fd);
+          cerr << "\033[1;31m[TODO!] DYNAMIC LINKING NOT IMPLEMENTED YET.\033[0m\n";
+          assert(false);
+        }
+        else if(include_type=="static"){
+          if(fd.find(".adpl") != string::npos){
+            string line;
+            ifstream source_code;
+            source_code.open(fd);
+            if(source_code.is_open()){
+              while(getline(source_code,line)){
+                if(line!="")process_line(line);
+              }
+              source_code.close();
+            }
+            else {
+              cerr << "Unable to open file.\n";
+              cerr << fd << "\n";
+              assert(false);
+            }
+          }
+          else{
+            if(fd != "stdlib"){
+              cerr << "\033[1;31mSTATIC INCLUDE ONLY SUPPORTED FOR .ADPL FILES OR ADPL LIB FILES!\033[0m\n";
+              assert(false);
+            }
+            char result[ PATH_MAX ];
+            size_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+            int j = count;
+            string path(result);
+            while(j > 0) if(path[--j]=='/') break;
+            path.erase(j+1);
+            path+="include/"+fd+".adpl";
+            string line;
+            ifstream source_code;
+            source_code.open(path);
+            if(source_code.is_open()){
+              while(getline(source_code,line)){
+                if(line!="")process_line(line);
+              }
+              source_code.close();
+            }
+            else {
+              cerr << "Unable to open file.\n";
+              cerr << path << "\n";
+              assert(false);
+            }
+          }
+        }
+        else{
+          cerr << "\033[1;31mUNSUPPORTED INCLUDE TYPE OF '"<< include_type <<"'.\033[0m\n";
+          assert(false);
+        }
       }
       else if(ops[i]=="global"){
         GLOBAL_FNS.push_back(ops[++i]);
@@ -547,12 +627,21 @@ void process_line(string &line){
       }
       else{
         cerr << "\033[1;31mCOMMAND "<< ops[i] <<" DOESN'T EXIST!\033[0m\n";
+        assert(false);
       }
     }
     else if(op=="@"){
       result.first=op;
       result.second=ops[++i];
       TK_STREAM.push_back(result);
+    }
+    else if(op=="unsafe"){
+      if(ops[i+1]!="fn"){
+        cerr << "\033[1;31mERROR: THE KEYWORD 'unsafe' IS A FUNCTION MODIFIER AND SHOULD BE PLACED BEFORE THE 'fn' KEYWORD.\033[0m\n";
+        assert(false);
+      }
+      // cerr << "\033[1;32mWARNING: UNSAFE IS MAINLY USED IN THE STANDARD LIBRARY FOR ASM FUNCTIONS, UNSAFE GETS RID OF THE SAFE ENVIORMENT GIVEN TO A FUNCTION.\033[0m\n";
+      UNSAFE_FNS.push_back(ops[i+2]);
     }
     else if(op!=""){
       result.first=op;
@@ -665,6 +754,7 @@ void CHECK_GRAMMER(){
       int j = 2;
       while(buff.first!=")"){
         buff = TK_STREAM[i+j];
+        if(TYPE_BITS.find(buff.first) != TYPE_BITS.end()) VAR_TYPE[buff.second] = buff.first;
         j++;
       }
       if(TYPE_BITS.find(TK_STREAM[i+j].first) != TYPE_BITS.end()) RET_FNS[CF]=TK_STREAM[i+j].first;
@@ -772,6 +862,33 @@ void CHECK_GRAMMER(){
 //   }
 // }
 
+void DEADCODE_ELIM(vector<string> &INTER){
+  unordered_map<string, int> fns;
+  for(int i = 0; i < INTER.size(); i++){
+    if(INTER[i]=="Label:" && INTER[i+2]==";" && INTER[i+1]!="_start"){
+      fns[INTER[i+1]] = i;
+      i+=2;
+    }
+    else if(INTER[i]=="call" && fns.find(INTER[i+1]) != fns.end()){
+      fns.erase(INTER[i+1]);
+      i+=2;
+    }
+  }
+  vector<string> TEMP = INTER;
+  for(auto &p : fns){
+    int i = p.second;
+    while(i<TEMP.size()){
+      if(INTER[i]=="end"&&INTER[i+1]==p.first){
+        i+=3;
+        break;
+      }
+      i++;
+    }
+    TEMP.erase(TEMP.begin()+p.second,TEMP.begin()+i);
+  }
+  INTER=TEMP;
+}
+
 void PRESCAN(vector<string> &INTER){
   string CF = "global";
   for(int i = 0; i < INTER.size(); i++){
@@ -783,6 +900,7 @@ void PRESCAN(vector<string> &INTER){
       CALL_AMOUNT_MAPS[CF]++;
     }
   }
+  DEADCODE_ELIM(INTER);
 }
 
 void INTER_ASSIGN_FROM_ADDR(string &var, string size, string &ptr, vector<string> &INTER, int &i){
@@ -840,6 +958,7 @@ vector<string> INTERMEDIATE(){
         else{
           INTER.push_back(value);
           INTER.push_back(";");
+          i++;
         }
       }
       else if(type == "CHAR"){
@@ -862,6 +981,7 @@ vector<string> INTERMEDIATE(){
         else{
           INTER.push_back(value);
           INTER.push_back(";");
+          i++;
         }
       }
       else if(type == "BOOL"){
@@ -884,6 +1004,7 @@ vector<string> INTERMEDIATE(){
         else{
           if(value == "true" || value == "false") INTER.push_back(value);
           INTER.push_back(";");
+          i++;
         }
       }
       else if(type == "PTR"){
@@ -945,9 +1066,7 @@ vector<string> INTERMEDIATE(){
     }
     else if(cur.first=="end"){
       INTER.push_back("end");
-      if(cur.second=="loop"||cur.second=="if"||cur.second=="else"||cur.second=="elif"){
-        INTER.push_back(cur.second);
-      }
+      INTER.push_back(cur.second);
       INTER.push_back(";");
     }
     else if(cur.first=="loop" || cur.first=="if"){
@@ -1642,6 +1761,41 @@ vector<string> INTERMEDIATE(){
           assert(false);
         }
       }
+      else if(cur.first=="asm"){
+        if(TK_STREAM[++i].first != "("){
+          cerr << "\033[1;31mNO OPEN PAREN IN FN CALL OF 'asm'.\033[0m\n";
+          assert(false);
+        }
+        string _asm = parse(TK_STREAM[++i].first);
+        if(literal_or_var(_asm)!="STRING"){
+          cerr << "\033[1;31mFN 'asm' TAKES A SINGLE STRING LITERAL.\033[0m\n";
+          assert(false);
+        }
+        INTER.push_back("asm");
+        INTER.push_back("out");
+        INTER.push_back("rax");
+        string buffer;
+        for(int j = 1; j < _asm.size()-1; j++){
+          if(_asm[j]!='@'){
+            buffer+=_asm[j];
+          }
+          else{
+            if(buffer!="") INTER.push_back(buffer);
+            INTER.push_back("@");
+            buffer = "";
+            while(WHITESPACE.find(_asm[++j])==string::npos) buffer+=_asm[j];
+            INTER.push_back(buffer);
+            buffer = "";
+            buffer += _asm[j];
+          }
+        }
+        if(buffer!="") INTER.push_back(buffer);
+        INTER.push_back(";");
+        if(TK_STREAM[++i].first != ")"){
+          cerr << "\033[1;31mNO CLOSED PAREN IN FN CALL OF 'asm'.\033[0m\n";
+          assert(false);
+        }
+      }
     }
   }
   INTER.push_back("SECTION");
@@ -2013,81 +2167,6 @@ void COMPILE(string &wf, vector <string> &INTER){
   //INIT
     out_stream <<
 "SECTION .text		; code section\n"
-"WRITE_UINT:\n"
-"    mov    rbp, rsp\n"
-"    mov    eax, edi\n"
-"    mov    ecx, 0xa\n"
-"    push   rcx\n"
-"    mov    rsi, rsp\n"
-"    sub    rsp, 16\n"
-".toascii_digit:\n"
-"    xor    edx, edx\n"
-"    div    ecx\n"
-"    add    edx, 48\n"
-"    dec    rsi\n"
-"    mov    [rsi], dl\n"
-"    test   eax,eax\n"
-"    jnz  .toascii_digit\n"
-"    mov    eax, 1\n"
-"    mov    edi, 1\n"
-"    lea    edx, [rsp+16]\n"
-"    sub    edx, esi\n"
-"    syscall\n"
-"    add    rsp, 24\n"
-"    ret\n"
-"WRITE_CHAR:\n"
-"    push rax\n"
-"    mov eax, 1    ;write syscall\n"
-"    mov rdi, rsi  ;stdout\n"
-"    mov rsi, rsp  ;get char\n"
-"    mov edx, 1    ;char amount\n"
-"    syscall\n"
-"    pop rax\n"
-"    ret\n"
-"WRITE_NEW_LINE:\n"
-"    push 10\n"
-"    mov rdi, rax  ;outstream\n"
-"    mov eax, 1    ;write syscall\n"
-"    mov rsi, rsp  ;get char\n"
-"    mov edx, 1    ;char amount\n"
-"    syscall\n"
-"    pop rax\n"
-"    ret\n"
-"WRITE_PTR:\n" //Actually WRITE_STRING, but the way we generate it we have the name WRITE_PTR
-"    mov eax, 1    ;write syscall\n"
-"    syscall\n"
-"    ret\n"
-"WRITE_BOOL:\n"
-"    test al, al\n"
-"    mov rdi, rsi  ;outstream\n"
-"    jz .false\n"
-"    lea rsi, [@TRUE]\n"
-"    mov edx, @TRUELEN\n"
-"    jmp .write\n"
-".false:\n"
-"    lea rsi, [@FALSE]\n"
-"    mov edx, @FALSELEN\n"
-".write:\n"
-"    mov eax, 1    ;write syscall\n"
-"    syscall\n"
-"    ret\n"
-"@READ_BITS:\n" // rdi is val, esi is bytes, rdx is buffer
-"    push 0\n"
-".loop_in:\n"
-"    shl rdi, 1\n"
-"    jnc .azero\n"
-"    pop rcx\n"
-"    mov byte [rdx+rcx], 1\n"
-"    jmp .loop_out\n"
-".azero:\n"
-"    pop rcx\n"
-"    mov byte [rdx+rcx], 0\n"
-".loop_out:\n"
-"    inc rcx\n"
-"    cmp rcx, rsi\n"
-"    jl .loop_in\n"
-"    push rcx\n"
-"    ret\n"
 "global _start		; make label available to linker\n";
   
   for(string &s : GLOBAL_FNS){
@@ -2144,7 +2223,6 @@ void COMPILE(string &wf, vector <string> &INTER){
           STACK.push_back("."+label+":\n");
         }
         else{
-          // cout << INTER[i] << "\n";
           cerr << "\033[1;31mIF WITHOUT A CONDITION.\033[0m\n";
           assert(false);
         }
@@ -2171,21 +2249,47 @@ void COMPILE(string &wf, vector <string> &INTER){
       else if(INTER[i]=="_start"){
         out_stream << INTER[i] << ":\n";
         CB=INTER[i];
-        int local_storage = CALL_AMOUNT_MAPS[CB]*16 + (PTR_AMOUNT_MAPS[CB]%2)*8;
+        int local_storage = CALL_AMOUNT_MAPS[CB]*16 + ((PTR_AMOUNT_MAPS[CB]-8)%2)*8;
         out_stream <<
   "    push rbp\n"
   "    mov rbp, rsp\n"
   "    sub rsp, "<< local_storage <<"\n";
         i++;
+        if(INTER[i+1]=="arg"){
+          i++;
+          string name = INTER[++i];
+          if(INTER[++i]!="4"){
+            cerr << "\033[1;31mERROR: FIRST ARG OF MAIN IS NOT A UINT. \033[0m\n";
+            assert(false);
+          }
+          BYTE_MAP[CB]+=4;
+          out_stream <<
+  "    mov " << asm_var(BYTE_MAP[CB], 4) << ", @argc\n";
+          i++;
+        }
+        if(INTER[i+1]=="arg"){
+          i++;
+          string name = INTER[++i];
+          if(INTER[++i]!="8"){
+            cerr << "\033[1;31mERROR: SECOND ARG OF MAIN IS NOT A PTR. \033[0m\n";
+            assert(false);
+          }
+          BYTE_MAP[CB]+=8;
+          out_stream <<
+  "    mov " << asm_var(BYTE_MAP[CB], 8) << ", @argv\n";
+          i++;
+        }
       }
       else{
         out_stream << INTER[i] << ":\n";
         CB=INTER[i];
         int local_storage = CALL_AMOUNT_MAPS[CB]*16 + (PTR_AMOUNT_MAPS[CB]%2)*8;
-        out_stream <<
-  "    push rbp\n"
-  "    mov rbp, rsp\n"
-  "    sub rsp, "<< local_storage <<"\n";
+        if(find(UNSAFE_FNS.begin(), UNSAFE_FNS.end(), INTER[i])==UNSAFE_FNS.end()){
+          out_stream <<
+    "    push rbp\n"
+    "    mov rbp, rsp\n"
+    "    sub rsp, "<< local_storage <<"\n";
+        }
         i++;
         if(INTER[i+1]=="arg"){
           int arg_count = 0;
@@ -2349,12 +2453,12 @@ void COMPILE(string &wf, vector <string> &INTER){
   "    mov rdi, 0\n"
   "    syscall\n";
         }
-        else if(RET_FNS.find(CB)==RET_FNS.end()){
+        else if(RET_FNS.find(CB)==RET_FNS.end()&&find(UNSAFE_FNS.begin(), UNSAFE_FNS.end(), CB)==UNSAFE_FNS.end()){
           out_stream <<
           "    pop rbp\n"
           "    ret\n";
         }
-        i++;
+        i+=2;
       }
     }
     else if(tk == "in" || tk == "insx"){
@@ -2673,7 +2777,9 @@ void COMPILE(string &wf, vector <string> &INTER){
         }
       }
       else if(INTER[i] == ".BSS"){
-        out_stream << "SECTION .bss\n";
+        out_stream << "SECTION .bss\n"
+        "@argc resd 1\n"
+        "@argv resq 1\n";
         i++;
         while(INTER[++i]!="/ESC/"){
           out_stream << INTER[i];
@@ -2756,6 +2862,10 @@ namespace flags{
   void VERSIONFLAG(string NA){
     cout << "ADPL VERSION 0.0.9\n";
   }
+  
+  void ASMFLAG(string NA){
+    ASMKEEP = true;
+  }
 }
 
 int main(int argc, char** argv){
@@ -2768,6 +2878,8 @@ int main(int argc, char** argv){
   string version_flag = "--version";
   string version_flag_desc = "Provides the version of ADPL being used.";
   prox.AddFlag(version_flag, flags::VERSIONFLAG, version_flag_desc, 0);
+  
+  prox.AddHelp("--build", "Rebuilds the compiler (Has to be first and only flag).");
   
   string debug_flag = "-d";
   string debug_flag_desc = "Prints debug text while compiling.";
@@ -2785,7 +2897,10 @@ int main(int argc, char** argv){
   string exec_flag_desc = "Name the exec file.";
   prox.AddFlag(exec_flag, flags::EXEC_FILE_SET, exec_flag_desc, 1);
   
-  prox.AddHelp("--build", "Rebuilds the compiler.");
+  string asm_flag = "-asm";
+  string asm_flag_desc = "Keeps assembly code after compilation.";
+  prox.AddFlag(asm_flag, flags::ASMFLAG, asm_flag_desc, 0);
+  
   prox.AddHelp("For additional info check README.md and FUNCTIONS.txt in /home/$USR/ADPL/.");
   
   prox.Parse(argc, argv);
@@ -2847,6 +2962,7 @@ int main(int argc, char** argv){
     start_timer();
     INIT_FUNC_ARG_REGISTER_LIST();
     vector<string> INTER_CODE = INTERMEDIATE();
+    PRESCAN(INTER_CODE);
     if(DEBUG_MODE){
       for(string &tk : INTER_CODE){
         cout<<tk<<" ";
@@ -2856,7 +2972,6 @@ int main(int argc, char** argv){
       }
       cout << "\n";
     }
-    PRESCAN(INTER_CODE);
     stop_timer("INTERMEDIATE CODE GEN");
     
     start_timer();
@@ -2877,17 +2992,17 @@ int main(int argc, char** argv){
     for(int i = 0; i < LINKED_FILES.size(); i++){
       cout << LINKED_FILES[i] << "\n";
       //BROKE AS HELL, DW AB IT
-      // if(LINKED_FILES[i].find(".adpl")){
-      //   //ADD -nr FLAG (DOESN'T RUN PROG)
-      //   //ADD -nc DOESN'T COMPILE NASM
-      //   //REVAMP FLAG SYSTEM
-      //   //CAN ONLY LINK ASM FOR NOW
-      //   //DESIRED RESULT:
-      //   //  ;;include 'stdlib.adpl'
-      //   // cerr << "\033[1;31m[TODO!]CAN'T LINK ADPL FOR NOW!\033[0m\n";
-      //   // assert(false);
-      // }
-      // else{
+      if(LINKED_FILES[i].find(".adpl") != string::npos){
+        //ADD -nr FLAG (DOESN'T RUN PROG)
+        //ADD -nc DOESN'T COMPILE NASM
+        //REVAMP FLAG SYSTEM
+        //CAN ONLY LINK ASM FOR NOW
+        //DESIRED RESULT:
+        //  ;;include 'stdlib.adpl'
+        cerr << "\033[1;31m[TODO!]CAN'T LINK ADPL FOR NOW!\033[0m\n";
+        assert(false);
+      }
+      else{
         string raw = LINKED_FILES[i];
         string linking_basename = "";
         for(int j = 0; j < raw.size()-4; j++){
@@ -2900,14 +3015,14 @@ int main(int argc, char** argv){
         system(char_line);
         if(DEBUG_MODE)cerr << char_line << "\n";
         LINK_BASENAMES.push_back(linking_basename);
-      // }
+      }
     }
       
     if(EXEC_FILE!=""){
-      ss << "ld -z muldefs -o " << EXEC_FILE << " " << FILE_BASENAME << ".o ";
+      ss << "ld -z muldef -o " << EXEC_FILE << " " << FILE_BASENAME << ".o ";
     }
     else{
-      ss << "ld -z muldefs -o " << FILE_BASENAME << " " << FILE_BASENAME << ".o ";
+      ss << "ld -z muldef -o " << FILE_BASENAME << " " << FILE_BASENAME << ".o ";
     }
     for(string &s : LINK_BASENAMES){
       ss << s << ".o ";
@@ -2915,7 +3030,7 @@ int main(int argc, char** argv){
     cmd_line = ss.str();
     char_line = cmd_line.c_str();
     ss.str("");
-    cerr << cmd_line << "\n";
+    //cerr << cmd_line << "\n";
     system(char_line);
     
     stop_timer("\nCOMPILATION OF ASM");
@@ -2931,9 +3046,6 @@ int main(int argc, char** argv){
       system(char_line);
       
       stop_timer("RUN");
-      
-      cout << "\n";
-      
       start_timer();
     }
     
@@ -2956,14 +3068,16 @@ int main(int argc, char** argv){
       if(DEBUG_MODE) cout << "DONE!\n";
     }
     
-    //DELETES .ASM FILE
-    if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
-    ss << "shred -u " << asm_file;
-    cmd_line = ss.str();
-    char_line = cmd_line.c_str();
-    ss.str("");
-    system(char_line);
-    if(DEBUG_MODE) cout << "DONE!\n";
+    if(!ASMKEEP){
+      //DELETES .ASM FILE
+      if(DEBUG_MODE) cout << "DELETING "<< asm_file << "...\n";
+      ss << "shred -u " << asm_file;
+      cmd_line = ss.str();
+      char_line = cmd_line.c_str();
+      ss.str("");
+      system(char_line);
+      if(DEBUG_MODE) cout << "DONE!\n";
+    }
     
     stop_timer("DELETION");
   }

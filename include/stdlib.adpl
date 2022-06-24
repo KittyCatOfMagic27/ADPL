@@ -1,0 +1,19 @@
+unsafe fn WRITE_NEW_LINE()
+  asm('    push 10\n    mov rdi, rax\n    mov eax, 1\n    mov rsi, rsp\n    mov edx, 1\n    syscall\n    pop rax\n    ret\n')
+end
+
+unsafe fn WRITE_PTR()
+  asm('    mov eax, 1\n    syscall\n    ret\n')
+end
+
+unsafe fn WRITE_CHAR()
+  asm('    push rax\n    mov eax, 1\n    mov rdi, rsi\n    mov rsi, rsp\n    mov edx, 1\n    syscall\n    pop rax\n    ret\n')
+end
+
+unsafe fn WRITE_BOOL()
+  asm('    test al, al\n    mov rdi, rsi\n    jz .false\n    lea rsi, [@TRUE]\n    mov edx, @TRUELEN\n    jmp .write\n.false:\n    lea rsi, [@FALSE]\n    mov edx, @FALSELEN\n.write:\n    mov eax, 1\n     syscall\n    ret\n')
+end
+
+unsafe fn WRITE_UINT()
+  asm('    mov    rbp, rsp\n    mov    eax, edi\n    mov    ecx, 0xa\n    push   rcx\n    mov    rsi, rsp\n    sub    rsp, 16\n.toascii_digit:\n    xor    edx, edx\n    div    ecx\n    add    edx, 48\n    dec    rsi\n    mov    [rsi], dl\n    test   eax,eax\n    jnz  .toascii_digit\n    mov    eax, 1\n    mov    edi, 1\n    lea    edx, [rsp+16]\n    sub    edx, esi\n    syscall\n    add    rsp, 24\n    ret\n')
+end
