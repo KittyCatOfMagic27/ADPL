@@ -1,5 +1,6 @@
+;;include static 'stdlib'
+
 fn main()
   let x 'Hello World!' # Make string
-  write(x) # Print string to stdout
-  new_line() # Print a new line
+  writeln(x) # Print string to stdout
 end
