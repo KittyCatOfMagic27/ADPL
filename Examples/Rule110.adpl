@@ -1,3 +1,5 @@
+;;include static 'stdlib'
+
 fn process_cell(BOOL a BOOL b BOOL c ) BOOL
   let __output true
   let w cast(UINT a)
