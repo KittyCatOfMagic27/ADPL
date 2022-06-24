@@ -15,9 +15,17 @@ CHANGE LOG:
 - Lots of syscall wrappers
 - And much more!
    
-PATCH 1 CHANGE LOG:
+PATCH 1 (Flags Rework) CHANGE LOG:
 - Flag system rework for actually dynamic flags
 - More flags :3
+
+PATCH 2 (Static Linking) CHANGE LOG:
+- Static linking (;;include static)
+- dead code elimintation
+- asm function
+- unsafe keyword (gets rid of enviroment for functions)
+- started stdlib
+- print functions are in stdlib
      
 Also incase it wasn't obvious this language is **MEGA UNSAFE**.
 So use this thing recreationly for now, change whatever you'd
@@ -59,6 +67,7 @@ To close a block you need to put the end keyword.
    
 To call a function you put the name of the function and then the args wrapped in parentheses.   
 ```
+;;include static 'stdlib'
 fn main()
   const x 'Hello ADPL!'
   writeln(x)
@@ -67,6 +76,7 @@ end
 
 You simply put the keyword ret, then the variable/value you'd like to return, the return type after the function arguments!!!
 ```
+;;include static 'stdlib'
 fn foo() UINT
   ret 69
 end
@@ -74,6 +84,13 @@ end
 fn main()  
   let a foo()
   writeln(a)
+end
+```
+     
+Function descriptors go infront of the 'fn' keyword and modifies properties of the function. Currently the only function descriptor is 'unsafe' and is mainly used to write purely asm functions as you can see in the standard library. USE AT YOUR OWN RISK.
+```
+unsafe fn add() UINT
+  asm('    mov eax, edi\n    add eax, esi\n    ret\n')
 end
 ```
      
@@ -96,6 +113,7 @@ They are stored within the function scope, which means that a variable defined i
 ### Constants ###
 These are stored gloablly in the .data and .bss sections of the asm. 
 ```
+;;include static 'stdlib'
 const string 'Hello World!'
 
 fn main()
@@ -168,6 +186,7 @@ Not | ! | Flips the value of a boolen. (a!)
 These are ascii chacters, use the type keyword of 'CHAR', and they are stored in an 8-bit register. The are inbetween single quotes and are only a single character.
   
 ```
+;;include static 'stdlib'
 fn main()
   write('H')
   write('e')
@@ -214,6 +233,7 @@ At Pointer | @ | Used to get the value at the address of a pointer (@TYPE a)
 ### String ###
 These can only be constants and cannot be literals or reassigned, right now they are simply used to write to the terminal easier. Despite this I am planning to expand upon this type by making a dynamic string or a char array.   
 ```
+;;include static 'stdlib'
 const string0 'Hello World!'
 const string1 'Okay, this is a bit more normal...'
 fn main()
@@ -270,6 +290,7 @@ Using arrays is very verbose for now, but that will change soon!
 ### If ###
 If only runs the code within its block if the condition within the parentheses is met.
 ```
+;;include static 'stdlib'
 let x 10
 let y 10
 if(x==y)
@@ -280,6 +301,7 @@ end
 ### Else ##
 Else only activates if the previous ifs and else ifs were not met.
 ```
+;;include static 'stdlib'
 let x 49
 if(x>50)
   x++
@@ -291,11 +313,12 @@ end
 ### Else If ###
 Else if only activates if the previous ifs and else ifs were not met and the condition in the else if is met.
 ```
+;;include static 'stdlib'
 if(false)
   x++
 end
 else if(true)
-  write(69)
+  writeln(69)
 end
 ```
 
@@ -303,6 +326,7 @@ end
 Loop reruns the code within the loop until the condition is false.  
 Here is a program that writes the nth fibonacci number.  
 ```
+;;include static 'stdlib'
 fn main()
   let n 10
   let x 1
@@ -322,17 +346,15 @@ These are just like pre-processor directives in C. The current cones are more fo
 
 Name|Use
 :---:|:---
-global | Used to make functions (and possibly consts) available in linked files. NO USE CASE CURRENTLY
-include | Links .asm or .adpl file to current file. NO USE CASE CURRENTLY
-extern | Tells the compiler a function was called that was from a link file. NO USE CASE CURRENTLY
+global | Used to make functions (and possibly consts) available in dynamically linked files. NO USE CASE CURRENTLY
+include | Links an .adpl file to the current file. Has two include types, static and dynamic. Only static is implemeted right now.
+extern | Tells the compiler a function was called that was from a dynamically linked file. NO USE CASE CURRENTLY
 define | Replaces as all instances of the defined var with the value. EX: ;;define STDOUT 1
      
-The three ones that are currently defined as no use case are for linking files which is not fully implemented yet, BUT they are still in the source code in this version so they are getting documentation.  
-To use them you put the symbol ';;' in the global scope and then the arguements after it.
+Currently you can only link statically. Files with .adpl are user files in the cwd or in a specified path. Files without an extension are library files from ADPL/include.
 ```
-;;include 'stdlib.adpl'
+;;include static 'stdlib'
 ```
-Again linking and the standard library are not implemented yet, but this is a sneak peak of what all of this will look like!
 
 ## OS ##
 This language is built for Debian Linux and compiles to NASM.   
