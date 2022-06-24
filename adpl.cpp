@@ -2764,10 +2764,10 @@ void COMPILE(string &wf, vector <string> &INTER){
     else if(tk == "SECTION"){
       if(INTER[++i] == ".DATA"){
         out_stream << "SECTION .data\n"
-        "@TRUE: db 'true'\n"
-        "@TRUELEN   equ  $-@TRUE\n"
-        "@FALSE: db 'false'\n"
-        "@FALSELEN   equ  $-@FALSE\n"
+        "%TRUE: db 'true'\n"
+        "%TRUELEN   equ  $-%TRUE\n"
+        "%FALSE: db 'false'\n"
+        "%FALSELEN   equ  $-%FALSE\n"
         "timeval:\n"
         "   tv_sec  dd 0\n"
         "   tv_usec dd 0\n";
